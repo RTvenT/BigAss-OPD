@@ -1,4 +1,6 @@
 import pygame.mouse
+import os
+import sys
 
 from settings import *
 from player import Player
@@ -8,6 +10,9 @@ from pytmx.util_pygame import load_pygame
 from groups import AllSprites
 
 from random import randint, choice
+
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 class Game:
     def __init__(self):
