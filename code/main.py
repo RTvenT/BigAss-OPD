@@ -2,6 +2,7 @@ import pygame.mouse
 
 from settings import *
 from player import Player
+from hud import HUD
 from sprites import *
 from pytmx.util_pygame import load_pygame
 from groups import AllSprites
@@ -62,6 +63,10 @@ class Game:
                     surf = pygame.image.load(full_path).convert_alpha()
                     self.enemy_frames[folder].append(surf)
 
+    def check_game_over(self):
+        if not self.player.alive:
+            self.running = False
+
     def input(self):
         if pygame.mouse.get_pressed()[0] and self.can_shoot:
             self.shoot_sound.play()
@@ -92,8 +97,19 @@ class Game:
             if obj.name == 'Player':
                 self.player = Player((obj.x,obj.y), self.all_sprites, self.collision_sprites)
                 self.gun = Gun(self.player, self.all_sprites)
+
+                # HUD
+                self.hud = HUD(self.player)
             else:
-                self.spawn_positions.append((obj.x, obj.y))
+                pos = (obj.x, obj.y)
+                # Проверка расстояния
+                if self.player:
+                    player_pos = pygame.math.Vector2(self.player.rect.center)
+                    spawn_pos = pygame.math.Vector2(pos)
+                    if player_pos.distance_to(spawn_pos) > 100:  # например, минимум 100 пикселей от игрока
+                        self.spawn_positions.append(pos)
+                else:
+                    self.spawn_positions.append(pos)
 
     def bullet_collision(self):
         if self.bullet_sprites:
@@ -105,9 +121,13 @@ class Game:
                         sprite.destroy()
                     bullet.kill()
 
-    def player_collision(self):
-        if pygame.sprite.spritecollide(self.player, self.enemy_sprites, False, pygame.sprite.collide_mask):
-            self.running = False
+    # def player_collision(self):
+    #     if pygame.sprite.spritecollide(self.player, self.enemy_sprites, False, pygame.sprite.collide_mask):
+    #         self.running = False
+
+    def enemy_attacks(self):
+        for enemy in self.enemy_sprites:
+            enemy.attack()
 
     def run(self):
         while self.running:
@@ -126,14 +146,19 @@ class Game:
             self.input()
             self.all_sprites.update(dt)
             self.bullet_collision()
-            # self.player_collision()
+            self.enemy_attacks()
+            self.check_game_over()
 
             # draw
             self.display_surface.fill('black')
             self.all_sprites.draw(self.player.rect.center)
 
+            # crosshair
             crosshair_pos = pygame.mouse.get_pos()
             self.display_surface.blit(self.crosshair_image, crosshair_pos)
+
+            # hud
+            self.hud.draw(self.display_surface)
 
             pygame.display.update()
 

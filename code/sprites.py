@@ -79,6 +79,11 @@ class Enemy(pygame.sprite.Sprite):
         self.direction = pygame.Vector2()
         self.speed = 200
 
+        # stats
+        self.damage = 10
+        self.attack_cooldown = 1000
+        self.last_attack_time = 0
+
         # timer 
         self.death_time = 0
         self.death_duration = 400
@@ -99,6 +104,14 @@ class Enemy(pygame.sprite.Sprite):
         self.hitbox_rect.y += self.direction.y * self.speed * dt
         self.collision('vertical')
         self.rect.center = self.hitbox_rect.center
+
+    def attack(self):
+        current_time = pygame.time.get_ticks()
+        if self.hitbox_rect.colliderect(self.player.hitbox_rect):
+            if current_time - self.last_attack_time >= self.attack_cooldown:
+                self.player.health -= self.damage
+                self.last_attack_time = current_time
+
 
     def collision(self, direction):
         for sprite in self.collision_sprites:

@@ -8,6 +8,10 @@ class Player(pygame.sprite.Sprite):
         self.image = pygame.image.load(join('..', 'images', 'player', 'down', '0.png')).convert_alpha()
         self.rect = self.image.get_frect(center = pos)
         self.hitbox_rect = self.rect.inflate(-60, -90)
+
+        # stats
+        self.health = 100
+        self.alive = True
     
         # movement 
         self.direction = pygame.Vector2()
@@ -38,6 +42,10 @@ class Player(pygame.sprite.Sprite):
         self.collision('vertical')
         self.rect.center = self.hitbox_rect.center
 
+    def check_death(self):
+        if self.health <= 0:
+            self.alive = False
+
     def collision(self, direction):
         for sprite in self.collision_sprites:
             if sprite.rect.colliderect(self.hitbox_rect):
@@ -63,3 +71,4 @@ class Player(pygame.sprite.Sprite):
         self.input()
         self.move(dt)
         self.animate(dt)
+        self.check_death()
