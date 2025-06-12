@@ -98,12 +98,17 @@ class Enemy(pygame.sprite.Sprite):
         enemy_pos = pygame.Vector2(self.rect.center)
         self.direction = (player_pos - enemy_pos).normalize()
 
-        # update the rect position + collision
-        self.hitbox_rect.x += self.direction.x * self.speed * dt
-        self.collision('horizontal')
-        self.hitbox_rect.y += self.direction.y * self.speed * dt
-        self.collision('vertical')
-        self.rect.center = self.hitbox_rect.center
+        # копия хитбокса для проверки движения
+        test_hitbox = self.hitbox_rect.copy()
+        test_hitbox.x += self.direction.x * self.speed * dt
+        test_hitbox.y += self.direction.y * self.speed * dt
+
+        # если не врезаемся в игрока — двигаемся
+        if not test_hitbox.colliderect(self.player.hitbox_rect):
+            self.hitbox_rect = test_hitbox
+            self.collision('horizontal')
+            self.collision('vertical')
+            self.rect.center = self.hitbox_rect.center
 
     def attack(self):
         current_time = pygame.time.get_ticks()
