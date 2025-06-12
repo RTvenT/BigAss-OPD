@@ -54,6 +54,7 @@ class Bullet(pygame.sprite.Sprite):
         super().__init__(groups)
         self.image = surf
         self.rect = self.image.get_frect(center=pos)
+        self.mask = pygame.mask.from_surface(self.image)
         self.spawn_time = pygame.time.get_ticks()
         self.lifetime = 1000
 
@@ -75,6 +76,7 @@ class Enemy(pygame.sprite.Sprite):
         # image
         self.frames, self.frame_index = frames, 0
         self.image = self.frames[self.frame_index]
+        self.mask = pygame.mask.from_surface(self.image)
         self.animation_speed = 6
 
         # rect
@@ -96,6 +98,7 @@ class Enemy(pygame.sprite.Sprite):
     def animate(self, dt):
         self.frame_index += self.animation_speed * dt
         self.image = self.frames[int(self.frame_index) % len(self.frames)]
+        self.mask = pygame.mask.from_surface(self.image)
 
     def move(self, dt):
         player_pos = pygame.Vector2(self.player.rect.center)
@@ -153,16 +156,32 @@ class Enemy(pygame.sprite.Sprite):
                     self.hitbox_rect.top = self.player.hitbox_rect.bottom
 
     def destroy(self):
-        # start a timer
-        self.death_time = pygame.time.get_ticks()
-        # change the image
-        surf = pygame.mask.from_surface(self.frames[0]).to_surface()
-        surf.set_colorkey('black')
-        self.image = surf
+        """Создаем эффект облачка при смерти"""
+        if self.death_time == 0:  # Если враг еще не в процессе смерти
+            self.death_time = pygame.time.get_ticks()
+            
+            # Создаем маску из текущего кадра
+            mask = pygame.mask.from_surface(self.frames[0])
+            # Создаем поверхность для облачка
+            cloud_surf = mask.to_surface()
+            # Инвертируем цвета (черное становится белым)
+            cloud_surf.set_colorkey('black')
+            
+            # Применяем облачко
+            self.image = cloud_surf
+            self.mask = pygame.mask.from_surface(self.image)
 
     def death_timer(self):
-        if pygame.time.get_ticks() - self.death_time >= self.death_duration:
-            self.kill()
+        """Обработка анимации смерти"""
+        if self.death_time > 0:
+            current_time = pygame.time.get_ticks()
+            if current_time - self.death_time >= self.death_duration:
+                self.kill()
+            else:
+                # Делаем облачко постепенно прозрачным
+                progress = (current_time - self.death_time) / self.death_duration
+                alpha = int(255 * (1 - progress))
+                self.image.set_alpha(alpha)
 
     def update(self, dt):
         if self.death_time == 0:

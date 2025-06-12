@@ -1,4 +1,5 @@
 from settings import *
+from weapons import Pistol, Shotgun, Sword, AutoRifle
 
 
 class Player(pygame.sprite.Sprite):
@@ -14,11 +15,22 @@ class Player(pygame.sprite.Sprite):
         # stats
         self.health = 100
         self.alive = True
+        self.death_time = 0
 
         # movement
         self.direction = pygame.Vector2()
         self.speed = 500
         self.collision_sprites = collision_sprites
+
+        # weapon system
+        self.bullet_sprites = pygame.sprite.Group()  # Создаем группу для пуль
+        self.weapons = [
+            Pistol(self, {'all': groups, 'bullet': self.bullet_sprites}),
+            Shotgun(self, {'all': groups, 'bullet': self.bullet_sprites}),
+            AutoRifle(self, {'all': groups, 'bullet': self.bullet_sprites})
+        ]
+        self.current_weapon_index = 0
+        self.current_weapon = self.weapons[self.current_weapon_index]
 
     def load_images(self):
         self.frames = {'left': [], 'right': [], 'up': [], 'down': []}
@@ -31,13 +43,43 @@ class Player(pygame.sprite.Sprite):
                         surf = pygame.image.load(full_path).convert_alpha()
                         self.frames[state].append(surf)
 
+    def switch_weapon(self, index):
+        if 0 <= index < len(self.weapons):
+            self.current_weapon_index = index
+            self.current_weapon = self.weapons[self.current_weapon_index]
+
     def input(self):
+        if not self.alive:
+            return
+
         keys = pygame.key.get_pressed()
+        
+        # Movement
         self.direction.x = int(keys[pygame.K_RIGHT] or keys[pygame.K_d]) - int(keys[pygame.K_LEFT] or keys[pygame.K_a])
         self.direction.y = int(keys[pygame.K_DOWN] or keys[pygame.K_s]) - int(keys[pygame.K_UP] or keys[pygame.K_w])
         self.direction = self.direction.normalize() if self.direction else self.direction
 
+        # Weapon switching
+        if keys[pygame.K_1]:
+            self.switch_weapon(0)
+        elif keys[pygame.K_2]:
+            self.switch_weapon(1)
+        elif keys[pygame.K_3]:
+            self.switch_weapon(2)
+
+        # Shooting
+        if pygame.mouse.get_pressed()[0]:
+            self.current_weapon.shoot()
+
+    def get_weapon_direction(self):
+        mouse_pos = pygame.mouse.get_pos()
+        screen_center = pygame.math.Vector2(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2)
+        return (pygame.math.Vector2(mouse_pos) - screen_center).normalize()
+
     def move(self, dt):
+        if not self.alive:
+            return
+
         # Сохраняем старую позицию для возможного отката
         old_x = self.hitbox_rect.x
         old_y = self.hitbox_rect.y
@@ -49,8 +91,9 @@ class Player(pygame.sprite.Sprite):
         self.rect.center = self.hitbox_rect.center
 
     def check_death(self):
-        if self.health <= 0:
+        if self.health <= 0 and self.alive:
             self.alive = False
+            self.death_time = pygame.time.get_ticks()
 
     def collision(self, direction):
         # Коллизия с окружением
@@ -82,6 +125,9 @@ class Player(pygame.sprite.Sprite):
                         self.hitbox_rect.bottom = enemy.hitbox_rect.top
 
     def animate(self, dt):
+        if not self.alive:
+            return
+
         # get state
         if self.direction.x != 0:
             self.state = 'right' if self.direction.x > 0 else 'left'
@@ -97,6 +143,12 @@ class Player(pygame.sprite.Sprite):
         self.move(dt)
         self.animate(dt)
         self.check_death()
+
+        # Update weapon
+        if self.alive:
+            weapon_dir = self.get_weapon_direction()
+            self.current_weapon.update_position(pygame.math.Vector2(self.rect.center), weapon_dir)
+            self.current_weapon.update_timer(self.current_weapon.cooldown)
 
     def draw_hitbox(self, surface, offset):
         rect_with_offset = self.hitbox_rect.copy()

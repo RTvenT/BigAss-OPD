@@ -8,6 +8,8 @@ from hud import HUD
 from sprites import *
 from pytmx.util_pygame import load_pygame
 from groups import AllSprites
+from game_states import GameState
+from menu import MainMenu, PauseMenu, GameOverMenu, SettingsMenu
 
 from random import randint, choice
 
@@ -23,37 +25,40 @@ class Game:
         self.clock = pygame.time.Clock()
         self.running = True
 
+        # Состояние игры
+        self.state = GameState.MAIN_MENU
+        pygame.mouse.set_visible(True)  # Показываем курсор в главном меню
+        
+        # Меню
+        self.main_menu = MainMenu()
+        self.pause_menu = PauseMenu()
+        self.game_over_menu = GameOverMenu()
+        self.settings_menu = SettingsMenu()
+
         # crosshair
-        pygame.mouse.set_visible(False)
         self.crosshair_image = pygame.image.load(join('..', 'images', 'ui', 'crosshair.png')).convert_alpha()
 
-        # groups 
-        self.all_sprites = AllSprites()
-        self.collision_sprites = pygame.sprite.Group()
-        self.bullet_sprites = pygame.sprite.Group()
-        self.enemy_sprites = pygame.sprite.Group()
+        # Игровые объекты (создаются только при старте игры)
+        self.all_sprites = None
+        self.collision_sprites = None
+        self.bullet_sprites = None
+        self.enemy_sprites = None
+        self.player = None
+        self.hud = None
 
-        # gun timer
-        self.can_shoot = True
-        self.shoot_time = 0 
-        self.gun_cooldown = 100
-
-        # enemy timer 
+        # Спавн врагов
         self.enemy_event = pygame.event.custom_type()
-        pygame.time.set_timer(self.enemy_event, 300)
         self.spawn_positions = []
-        
+
         # audio 
-        self.shoot_sound = pygame.mixer.Sound(join('..', 'audio', 'shoot.wav'))
-        self.shoot_sound.set_volume(0.2)
-        self.impact_sound = pygame.mixer.Sound(join('..', 'audio', 'impact.ogg'))
         self.music = pygame.mixer.Sound(join('..', 'audio', 'music.wav'))
         self.music.set_volume(0.5)
         self.music.play(loops = -1)
+        self.impact_sound = pygame.mixer.Sound(join('..', 'audio', 'impact.ogg'))
+        self.impact_sound.set_volume(0.3)
 
-        # setup
+        # Изображения (загружаем один раз)
         self.load_images()
-        self.setup()
 
     def load_images(self):
         self.bullet_surf = pygame.image.load(join('..', 'images', 'gun', 'bullet.png')).convert_alpha()
@@ -68,23 +73,21 @@ class Game:
                     surf = pygame.image.load(full_path).convert_alpha()
                     self.enemy_frames[folder].append(surf)
 
-    def check_game_over(self):
-        if not self.player.alive:
-            self.running = False
+    def init_game(self):
+        """Инициализация игровых объектов"""
+        # groups 
+        self.all_sprites = AllSprites()
+        self.collision_sprites = pygame.sprite.Group()
+        self.enemy_sprites = pygame.sprite.Group()
 
-    def input(self):
-        if pygame.mouse.get_pressed()[0] and self.can_shoot:
-            self.shoot_sound.play()
-            pos = self.gun.rect.center + self.gun.player_direction * 50
-            Bullet(self.bullet_surf, pos, self.gun.player_direction, (self.all_sprites, self.bullet_sprites))
-            self.can_shoot = False
-            self.shoot_time = pygame.time.get_ticks()
+        # Сброс позиций спавна
+        self.spawn_positions = []
+        
+        # Таймер спавна врагов
+        pygame.time.set_timer(self.enemy_event, 300)
 
-    def gun_timer(self):
-        if not self.can_shoot:
-            current_time = pygame.time.get_ticks()
-            if current_time - self.shoot_time >= self.gun_cooldown:
-                self.can_shoot = True
+        # setup
+        self.setup()
 
     def setup(self):
         map = load_pygame(join('..', 'data', 'maps', 'world.tmx'))
@@ -100,8 +103,12 @@ class Game:
 
         for obj in map.get_layer_by_name('Entities'):
             if obj.name == 'Player':
-                self.player = Player((obj.x,obj.y), self.all_sprites, self.collision_sprites, self.enemy_sprites)
-                self.gun = Gun(self.player, self.all_sprites)
+                self.player = Player(
+                    (obj.x,obj.y), 
+                    self.all_sprites, 
+                    self.collision_sprites, 
+                    self.enemy_sprites
+                )
 
                 # HUD
                 self.hud = HUD(self.player)
@@ -111,69 +118,154 @@ class Game:
                 if self.player:
                     player_pos = pygame.math.Vector2(self.player.rect.center)
                     spawn_pos = pygame.math.Vector2(pos)
-                    if player_pos.distance_to(spawn_pos) > 100:  # например, минимум 100 пикселей от игрока
+                    if player_pos.distance_to(spawn_pos) > 100:
                         self.spawn_positions.append(pos)
                 else:
                     self.spawn_positions.append(pos)
 
-    def bullet_collision(self):
-        if self.bullet_sprites:
-            for bullet in self.bullet_sprites:
-                collision_sprites = pygame.sprite.spritecollide(bullet, self.enemy_sprites, False,
-                                                                pygame.sprite.collide_mask)
-                if collision_sprites:
-                    self.impact_sound.play()
-                    for sprite in collision_sprites:
-                        # Проверяем, что враг еще не начал анимацию смерти
-                        if sprite.death_time == 0:
-                            sprite.destroy()
-                            self.hud.add_kill()
-                    bullet.kill()
+    def check_game_over(self):
+        if self.player and not self.player.alive:
+            if self.state != GameState.GAME_OVER:
+                self.state = GameState.GAME_OVER
+                pygame.mouse.set_visible(True)
 
-    # def player_collision(self):
-    #     if pygame.sprite.spritecollide(self.player, self.enemy_sprites, False, pygame.sprite.collide_mask):
-    #         self.running = False
+    def bullet_collision(self):
+        """Проверка коллизий пуль с врагами"""
+        if self.player:  # Проверяем, что игрок существует
+            for bullet in self.player.bullet_sprites.sprites():
+                # Используем sprite.spritecollide вместо pygame.sprite.spritecollide
+                collided_enemies = pygame.sprite.spritecollide(bullet, self.enemy_sprites, False, pygame.sprite.collide_mask)
+                
+                if collided_enemies:
+                    self.impact_sound.play()
+                    bullet.kill()
+                    
+                    for enemy in collided_enemies:
+                        if enemy.death_time == 0:  # Если враг еще жив
+                            enemy.destroy()
+                            self.hud.add_kill()
 
     def enemy_attacks(self):
         for enemy in self.enemy_sprites:
             enemy.attack()
 
+    def handle_menu_events(self, event):
+        """Обработка событий в меню"""
+        if self.state == GameState.MAIN_MENU:
+            result = self.main_menu.handle_event(event)
+            if result == "играть":
+                self.state = GameState.PLAYING
+                self.init_game()
+                pygame.mouse.set_visible(False)
+            elif result == "настройки":
+                self.state = GameState.SETTINGS
+            elif result == "выход":
+                self.running = False
+                
+        elif self.state == GameState.PAUSED:
+            result = self.pause_menu.handle_event(event)
+            if result == "продолжить":
+                self.state = GameState.PLAYING
+                pygame.mouse.set_visible(False)
+            elif result == "настройки":
+                self.state = GameState.SETTINGS
+            elif result == "в меню":
+                self.state = GameState.MAIN_MENU
+                pygame.mouse.set_visible(True)
+                
+        elif self.state == GameState.GAME_OVER:
+            result = self.game_over_menu.handle_event(event)
+            if result == "заново":
+                self.state = GameState.PLAYING
+                self.init_game()
+                pygame.mouse.set_visible(False)
+            elif result == "в меню":
+                self.state = GameState.MAIN_MENU
+                pygame.mouse.set_visible(True)
+                
+        elif self.state == GameState.SETTINGS:
+            result = self.settings_menu.handle_event(event)
+            if result == "назад":
+                # Возвращаемся в предыдущее состояние
+                if hasattr(self, '_prev_state'):
+                    self.state = self._prev_state
+                else:
+                    self.state = GameState.MAIN_MENU
+            # Применяем настройки громкости
+            self.music.set_volume(self.settings_menu.music_volume)
+
     def run(self):
         while self.running:
             # dt 
-            dt = self.clock.tick() / 1000
+            dt = self.clock.tick(60) / 1000
 
             # event loop 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
-                if event.type == self.enemy_event:
-                    Enemy(choice(self.spawn_positions), choice(list(self.enemy_frames.values())), (self.all_sprites, self.enemy_sprites), self.player, self.collision_sprites)
+                
+                # Пауза по ESC во время игры
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        if self.state == GameState.PLAYING:
+                            self.state = GameState.PAUSED
+                            pygame.mouse.set_visible(True)
+                        elif self.state == GameState.PAUSED:
+                            self.state = GameState.PLAYING
+                            pygame.mouse.set_visible(False)
+                
+                # Обработка событий меню
+                if self.state != GameState.PLAYING:
+                    self.handle_menu_events(event)
+                
+                # Спавн врагов только во время игры
+                if self.state == GameState.PLAYING and event.type == self.enemy_event:
+                    if self.spawn_positions and self.enemy_frames:
+                        Enemy(choice(self.spawn_positions), choice(list(self.enemy_frames.values())), 
+                              (self.all_sprites, self.enemy_sprites), self.player, self.collision_sprites)
 
-            # update 
-            self.gun_timer()
-            self.input()
-            self.all_sprites.update(dt)
-            self.bullet_collision()
-            self.enemy_attacks()
-            self.check_game_over()
+            # Обновление игры только в состоянии PLAYING
+            if self.state == GameState.PLAYING:
+                self.all_sprites.update(dt)
+                self.bullet_collision()
+                self.enemy_attacks()
+                self.check_game_over()
 
-            # draw
-            self.display_surface.fill('black')
-            self.all_sprites.draw(self.player.rect.center)
+            # Отрисовка
+            if self.state == GameState.PLAYING:
+                self.display_surface.fill('black')
+                self.all_sprites.draw(self.player.rect.center)
 
-            # crosshair
-            crosshair_pos = pygame.mouse.get_pos()
-            self.display_surface.blit(self.crosshair_image, crosshair_pos)
+                # crosshair
+                crosshair_pos = pygame.mouse.get_pos()
+                self.display_surface.blit(self.crosshair_image, crosshair_pos)
 
-            # hud
-            self.hud.draw(self.display_surface)
+                # hud
+                self.hud.draw(self.display_surface)
 
-            # hitboxes
-            self.player.draw_hitbox(self.display_surface, self.all_sprites.offset)
-            for enemy in self.enemy_sprites:
-                enemy.draw_hitbox(self.all_sprites.display_surface, self.all_sprites.offset)
-
+                # hitboxes (можно убрать в финальной версии)
+                self.player.draw_hitbox(self.display_surface, self.all_sprites.offset)
+                for enemy in self.enemy_sprites:
+                    enemy.draw_hitbox(self.all_sprites.display_surface, self.all_sprites.offset)
+                    
+            elif self.state == GameState.MAIN_MENU:
+                self.main_menu.draw(self.display_surface)
+                
+            elif self.state == GameState.PAUSED:
+                # Рисуем игру на фоне
+                if self.all_sprites and self.player:
+                    self.display_surface.fill('black')
+                    self.all_sprites.draw(self.player.rect.center)
+                    self.hud.draw(self.display_surface)
+                self.pause_menu.draw(self.display_surface)
+                
+            elif self.state == GameState.GAME_OVER:
+                survival_time = self.hud.get_survival_time() if self.hud else 0
+                kills = self.hud.kills if self.hud else 0
+                self.game_over_menu.draw(self.display_surface, survival_time, kills)
+                
+            elif self.state == GameState.SETTINGS:
+                self.settings_menu.draw(self.display_surface)
 
             pygame.display.update()
 
