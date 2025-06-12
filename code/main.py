@@ -119,11 +119,15 @@ class Game:
     def bullet_collision(self):
         if self.bullet_sprites:
             for bullet in self.bullet_sprites:
-                collision_sprites = pygame.sprite.spritecollide(bullet, self.enemy_sprites, False, pygame.sprite.collide_mask)
+                collision_sprites = pygame.sprite.spritecollide(bullet, self.enemy_sprites, False,
+                                                                pygame.sprite.collide_mask)
                 if collision_sprites:
                     self.impact_sound.play()
                     for sprite in collision_sprites:
-                        sprite.destroy()
+                        # Проверяем, что враг еще не начал анимацию смерти
+                        if sprite.death_time == 0:
+                            sprite.destroy()
+                            self.hud.add_kill()
                     bullet.kill()
 
     # def player_collision(self):
