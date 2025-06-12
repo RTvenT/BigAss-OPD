@@ -100,7 +100,7 @@ class Game:
 
         for obj in map.get_layer_by_name('Entities'):
             if obj.name == 'Player':
-                self.player = Player((obj.x,obj.y), self.all_sprites, self.collision_sprites)
+                self.player = Player((obj.x,obj.y), self.all_sprites, self.collision_sprites, self.enemy_sprites)
                 self.gun = Gun(self.player, self.all_sprites)
 
                 # HUD
@@ -164,6 +164,12 @@ class Game:
 
             # hud
             self.hud.draw(self.display_surface)
+
+            # hitboxes
+            self.player.draw_hitbox(self.display_surface, self.all_sprites.offset)
+            for enemy in self.enemy_sprites:
+                enemy.draw_hitbox(self.all_sprites.display_surface, self.all_sprites.offset)
+
 
             pygame.display.update()
 

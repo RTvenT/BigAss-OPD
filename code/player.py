@@ -1,19 +1,21 @@
-from settings import * 
+from settings import *
+
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, pos, groups, collision_sprites):
+    def __init__(self, pos, groups, collision_sprites, enemy_sprites):
         super().__init__(groups)
         self.load_images()
         self.state, self.frame_index = 'right', 0
         self.image = pygame.image.load(join('..', 'images', 'player', 'down', '0.png')).convert_alpha()
-        self.rect = self.image.get_frect(center = pos)
+        self.rect = self.image.get_frect(center=pos)
         self.hitbox_rect = self.rect.inflate(-60, -90)
+        self.enemy_sprites = enemy_sprites
 
         # stats
         self.health = 100
         self.alive = True
-    
-        # movement 
+
+        # movement
         self.direction = pygame.Vector2()
         self.speed = 500
         self.collision_sprites = collision_sprites
@@ -24,7 +26,7 @@ class Player(pygame.sprite.Sprite):
         for state in self.frames.keys():
             for folder_path, sub_folders, file_names in walk(join('..', 'images', 'player', state)):
                 if file_names:
-                    for file_name in sorted(file_names, key= lambda name: int(name.split('.')[0])):
+                    for file_name in sorted(file_names, key=lambda name: int(name.split('.')[0])):
                         full_path = join(folder_path, file_name)
                         surf = pygame.image.load(full_path).convert_alpha()
                         self.frames[state].append(surf)
@@ -36,6 +38,10 @@ class Player(pygame.sprite.Sprite):
         self.direction = self.direction.normalize() if self.direction else self.direction
 
     def move(self, dt):
+        # Сохраняем старую позицию для возможного отката
+        old_x = self.hitbox_rect.x
+        old_y = self.hitbox_rect.y
+
         self.hitbox_rect.x += self.direction.x * self.speed * dt
         self.collision('horizontal')
         self.hitbox_rect.y += self.direction.y * self.speed * dt
@@ -47,17 +53,36 @@ class Player(pygame.sprite.Sprite):
             self.alive = False
 
     def collision(self, direction):
+        # Коллизия с окружением
         for sprite in self.collision_sprites:
             if sprite.rect.colliderect(self.hitbox_rect):
                 if direction == 'horizontal':
-                    if self.direction.x > 0: self.hitbox_rect.right = sprite.rect.left
-                    if self.direction.x < 0: self.hitbox_rect.left = sprite.rect.right
+                    if self.direction.x > 0:
+                        self.hitbox_rect.right = sprite.rect.left
+                    if self.direction.x < 0:
+                        self.hitbox_rect.left = sprite.rect.right
                 else:
-                    if self.direction.y < 0: self.hitbox_rect.top = sprite.rect.bottom
-                    if self.direction.y > 0: self.hitbox_rect.bottom = sprite.rect.top
+                    if self.direction.y < 0:
+                        self.hitbox_rect.top = sprite.rect.bottom
+                    if self.direction.y > 0:
+                        self.hitbox_rect.bottom = sprite.rect.top
+
+        # Коллизия с врагами - игрок не может их сдвинуть
+        for enemy in self.enemy_sprites:
+            if enemy.death_time == 0 and enemy.hitbox_rect.colliderect(self.hitbox_rect):
+                if direction == 'horizontal':
+                    if self.direction.x > 0:
+                        self.hitbox_rect.right = enemy.hitbox_rect.left
+                    if self.direction.x < 0:
+                        self.hitbox_rect.left = enemy.hitbox_rect.right
+                else:
+                    if self.direction.y < 0:
+                        self.hitbox_rect.top = enemy.hitbox_rect.bottom
+                    if self.direction.y > 0:
+                        self.hitbox_rect.bottom = enemy.hitbox_rect.top
 
     def animate(self, dt):
-        # get state 
+        # get state
         if self.direction.x != 0:
             self.state = 'right' if self.direction.x > 0 else 'left'
         if self.direction.y != 0:
@@ -72,3 +97,8 @@ class Player(pygame.sprite.Sprite):
         self.move(dt)
         self.animate(dt)
         self.check_death()
+
+    def draw_hitbox(self, surface, offset):
+        rect_with_offset = self.hitbox_rect.copy()
+        rect_with_offset.topleft += offset
+        pygame.draw.rect(surface, (255, 0, 0), rect_with_offset, 2)
