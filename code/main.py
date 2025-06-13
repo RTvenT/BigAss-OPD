@@ -1,6 +1,7 @@
 import pygame.mouse
 import os
 import sys
+import random
 
 from settings import *
 from player import Player
@@ -10,6 +11,7 @@ from pytmx.util_pygame import load_pygame
 from groups import AllSprites
 from game_states import GameState
 from menu import MainMenu, PauseMenu, GameOverMenu, SettingsMenu
+from sprites import Boss, Enemy
 
 from random import randint, choice
 
@@ -48,7 +50,12 @@ class Game:
 
         # Спавн врагов
         self.enemy_event = pygame.event.custom_type()
+        self.boss_event = pygame.event.custom_type()  # Новый тип события для босса
         self.spawn_positions = []
+        self.last_boss_spawn = 0  # Время последнего спавна босса
+        self.boss_spawn_interval = 30000  # 30 секунд в миллисекундах
+        self.boss_spawn_timer = 0  # Таймер для спавна босса
+        self.initial_boss_delay = True  # Флаг для первого спавна
 
         # audio 
         self.music = pygame.mixer.Sound(join('..', 'audio', 'music.wav'))
@@ -68,10 +75,18 @@ class Game:
         for folder in folders:
             for folder_path, _, file_names in walk(join('..', 'images', 'enemies', folder)):
                 self.enemy_frames[folder] = []
-                for file_name in sorted(file_names, key = lambda name: int(name.split('.')[0])):
-                    full_path = join(folder_path, file_name)
-                    surf = pygame.image.load(full_path).convert_alpha()
-                    self.enemy_frames[folder].append(surf)
+                if folder == 'Boss':
+                    # Для папки Boss просто загружаем изображения без сортировки по номерам
+                    for file_name in file_names:
+                        full_path = join(folder_path, file_name)
+                        surf = pygame.image.load(full_path).convert_alpha()
+                        self.enemy_frames[folder].append(surf)
+                else:
+                    # Для остальных папок используем числовую сортировку
+                    for file_name in sorted(file_names, key=lambda name: int(name.split('.')[0])):
+                        full_path = join(folder_path, file_name)
+                        surf = pygame.image.load(full_path).convert_alpha()
+                        self.enemy_frames[folder].append(surf)
 
     def init_game(self):
         """Инициализация игровых объектов"""
@@ -85,9 +100,26 @@ class Game:
         
         # Таймер спавна врагов
         pygame.time.set_timer(self.enemy_event, 300)
+        
+        # Сброс времени спавна босса
+        self.last_boss_spawn = pygame.time.get_ticks()
+        self.boss_spawn_timer = 0
+        self.initial_boss_delay = True  # Флаг для первого спавна
+
+        # Создаем новый HUD
+        self.hud = HUD()
+
+        # Сброс финальных результатов
+        self.final_kills = 0
+        self.final_time = 0
 
         # setup
         self.setup()
+
+        # После создания игрока присваиваем его HUD'у
+        if self.player:
+            self.hud.player = self.player
+            self.hud.reset()  # Сбрасываем таймеры
 
     def setup(self):
         map = load_pygame(join('..', 'data', 'maps', 'world.tmx'))
@@ -101,6 +133,10 @@ class Game:
         for obj in map.get_layer_by_name('Collisions'):
             CollisionSprite((obj.x, obj.y), pygame.Surface((obj.width, obj.height)), self.collision_sprites)
 
+        # Создаем HUD до создания игрока
+        self.hud = HUD()
+        print("HUD создан!")  # Отладка
+
         for obj in map.get_layer_by_name('Entities'):
             if obj.name == 'Player':
                 self.player = Player(
@@ -109,9 +145,9 @@ class Game:
                     self.collision_sprites, 
                     self.enemy_sprites
                 )
-
-                # HUD
-                self.hud = HUD(self.player)
+                # Присваиваем HUD игроку
+                self.player.hud = self.hud
+                print("HUD присвоен игроку!")  # Отладка
             else:
                 pos = (obj.x, obj.y)
                 # Проверка расстояния
@@ -126,24 +162,28 @@ class Game:
     def check_game_over(self):
         if self.player and not self.player.alive:
             if self.state != GameState.GAME_OVER:
+                # Сохраняем финальные результаты перед переходом в game over
+                if self.hud:
+                    self.final_kills = self.hud.kills
+                    self.final_time = self.hud.game_time
+                else:
+                    self.final_kills = 0
+                    self.final_time = 0
+                
                 self.state = GameState.GAME_OVER
                 pygame.mouse.set_visible(True)
 
     def bullet_collision(self):
-        """Проверка коллизий пуль с врагами"""
-        if self.player:  # Проверяем, что игрок существует
-            for bullet in self.player.bullet_sprites.sprites():
-                # Используем sprite.spritecollide вместо pygame.sprite.spritecollide
-                collided_enemies = pygame.sprite.spritecollide(bullet, self.enemy_sprites, False, pygame.sprite.collide_mask)
-                
-                if collided_enemies:
-                    self.impact_sound.play()
+        # Проверяем столкновения пуль с врагами
+        for enemy in self.enemy_sprites:
+            for bullet in self.player.bullet_sprites:
+                if pygame.sprite.collide_mask(bullet, enemy):
                     bullet.kill()
-                    
-                    for enemy in collided_enemies:
-                        if enemy.death_time == 0:  # Если враг еще жив
-                            enemy.destroy()
-                            self.hud.add_kill()
+                    # Наносим урон врагу
+                    print(f"Попадание! Урон: {self.player.current_weapon.damage}")  # Отладка
+                    enemy.take_damage(self.player.current_weapon.damage)
+                    print(f"Здоровье врага после урона: {enemy.health}")  # Отладка
+                    self.impact_sound.play()
 
     def enemy_attacks(self):
         for enemy in self.enemy_sprites:
@@ -194,16 +234,47 @@ class Game:
             # Применяем настройки громкости
             self.music.set_volume(self.settings_menu.music_volume)
 
+    def spawn_boss(self):
+        """Спавн босса недалеко от игрока"""
+        if not self.player:
+            return
+
+        self.boss_spawn_timer += self.clock.get_time()  # Добавляем прошедшее время
+        time_until_boss = (self.boss_spawn_interval - self.boss_spawn_timer) // 1000  # Время до босса в секундах
+        
+        # Обновляем информацию о времени до босса в HUD
+        if self.hud:
+            self.hud.time_until_boss = time_until_boss
+
+        # Проверяем, прошло ли достаточно времени для первого спавна
+        if self.initial_boss_delay and self.boss_spawn_timer < 10000:  # 10 секунд задержки
+            return
+
+        self.initial_boss_delay = False  # Сбрасываем флаг после первой задержки
+
+        if self.boss_spawn_timer >= self.boss_spawn_interval:
+            print("Спавним босса!")  # Отладочное сообщение
+            
+            # Спавним босса на расстоянии 200 пикселей от игрока в случайном направлении
+            angle = random.randint(0, 360)  # Случайный угол
+            spawn_distance = 200  # Расстояние от игрока
+            
+            # Вычисляем позицию спавна
+            spawn_offset = pygame.Vector2(spawn_distance, 0).rotate(angle)
+            spawn_pos = pygame.Vector2(self.player.rect.center) + spawn_offset
+            
+            Boss(spawn_pos, [self.all_sprites, self.enemy_sprites], self.player, self.collision_sprites)
+            self.boss_spawn_timer = 0  # Сбрасываем таймер
+
     def run(self):
         while self.running:
-            # dt 
-            dt = self.clock.tick(60) / 1000
+            dt = self.clock.tick() / 1000
 
-            # event loop 
+            # Обработка событий
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
-                
+
                 # Пауза по ESC во время игры
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
@@ -213,63 +284,79 @@ class Game:
                         elif self.state == GameState.PAUSED:
                             self.state = GameState.PLAYING
                             pygame.mouse.set_visible(False)
-                
-                # Обработка событий меню
-                if self.state != GameState.PLAYING:
-                    self.handle_menu_events(event)
-                
-                # Спавн врагов только во время игры
-                if self.state == GameState.PLAYING and event.type == self.enemy_event:
-                    if self.spawn_positions and self.enemy_frames:
-                        Enemy(choice(self.spawn_positions), choice(list(self.enemy_frames.values())), 
-                              (self.all_sprites, self.enemy_sprites), self.player, self.collision_sprites)
 
-            # Обновление игры только в состоянии PLAYING
-            if self.state == GameState.PLAYING:
+                # Обработка событий меню
+                if self.state == GameState.MAIN_MENU:
+                    self.handle_menu_events(event)
+                elif self.state == GameState.PAUSED:
+                    self.handle_menu_events(event)
+                elif self.state == GameState.GAME_OVER:
+                    self.handle_menu_events(event)
+                elif self.state == GameState.SETTINGS:
+                    self.handle_menu_events(event)
+                elif self.state == GameState.PLAYING:
+                    if event.type == self.enemy_event:
+                        self.spawn_enemies()
+
+            # Обновление и отрисовка в зависимости от состояния игры
+            if self.state == GameState.MAIN_MENU:
+                self.display_surface.fill('black')
+                self.main_menu.draw(self.display_surface)
+            elif self.state == GameState.PAUSED:
+                # Сначала рисуем игру
+                if self.player and self.all_sprites:
+                    self.display_surface.fill('black')
+                    self.all_sprites.draw(self.player.rect.center)
+                # Затем меню паузы поверх
+                self.pause_menu.draw(self.display_surface)
+            elif self.state == GameState.GAME_OVER:
+                self.display_surface.fill('black')
+                # Передаем сохраненные результаты
+                self.game_over_menu.draw(self.display_surface, self.final_time, self.final_kills)
+            elif self.state == GameState.SETTINGS:
+                self.display_surface.fill('black')
+                self.settings_menu.draw(self.display_surface)
+            elif self.state == GameState.PLAYING:
+                # Обновление
                 self.all_sprites.update(dt)
                 self.bullet_collision()
                 self.enemy_attacks()
                 self.check_game_over()
+                self.spawn_boss()
 
-            # Отрисовка
-            if self.state == GameState.PLAYING:
+                # Отрисовка
                 self.display_surface.fill('black')
-                self.all_sprites.draw(self.player.rect.center)
+                if self.player:
+                    self.all_sprites.draw(self.player.rect.center)
+                    
+                    # Отрисовка хитбоксов
+                    self.player.draw_hitbox(self.display_surface, self.all_sprites.offset)
+                    for enemy in self.enemy_sprites:
+                        enemy.draw_hitbox(self.display_surface, self.all_sprites.offset)
+                        enemy.draw_hp_bar(self.display_surface, self.all_sprites.offset)
+                
+                # Отрисовка HUD только во время игры
+                if self.player and self.hud:
+                    self.hud.draw(self.display_surface)
 
                 # crosshair
-                crosshair_pos = pygame.mouse.get_pos()
-                self.display_surface.blit(self.crosshair_image, crosshair_pos)
-
-                # hud
-                self.hud.draw(self.display_surface)
-
-                # hitboxes (можно убрать в финальной версии)
-                self.player.draw_hitbox(self.display_surface, self.all_sprites.offset)
-                for enemy in self.enemy_sprites:
-                    enemy.draw_hitbox(self.all_sprites.display_surface, self.all_sprites.offset)
-                    
-            elif self.state == GameState.MAIN_MENU:
-                self.main_menu.draw(self.display_surface)
-                
-            elif self.state == GameState.PAUSED:
-                # Рисуем игру на фоне
-                if self.all_sprites and self.player:
-                    self.display_surface.fill('black')
-                    self.all_sprites.draw(self.player.rect.center)
-                    self.hud.draw(self.display_surface)
-                self.pause_menu.draw(self.display_surface)
-                
-            elif self.state == GameState.GAME_OVER:
-                survival_time = self.hud.get_survival_time() if self.hud else 0
-                kills = self.hud.kills if self.hud else 0
-                self.game_over_menu.draw(self.display_surface, survival_time, kills)
-                
-            elif self.state == GameState.SETTINGS:
-                self.settings_menu.draw(self.display_surface)
+                if not pygame.mouse.get_visible():
+                    crosshair_rect = self.crosshair_image.get_rect(center = pygame.mouse.get_pos())
+                    self.display_surface.blit(self.crosshair_image, crosshair_rect)
 
             pygame.display.update()
-
+        
         pygame.quit()
+
+    def spawn_enemies(self):
+        """Спавн обычных врагов"""
+        if self.spawn_positions and self.enemy_frames:
+            pos = choice(self.spawn_positions)
+            # Выбираем случайный тип врага, кроме босса
+            available_frames = {k: v for k, v in self.enemy_frames.items() if k != 'Boss'}
+            if available_frames:
+                frames = choice(list(available_frames.values()))
+                Enemy(pos, frames, [self.all_sprites, self.enemy_sprites], self.player, self.collision_sprites)
 
 if __name__ == '__main__':
     game = Game()

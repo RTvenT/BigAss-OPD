@@ -16,6 +16,10 @@ class Weapon:
         self.bullet_surf = pygame.image.load(join('..', 'images', 'gun', 'bullet.png')).convert_alpha()
         self.shoot_sound = pygame.mixer.Sound(join('..', 'audio', 'shoot.wav'))
         self.shoot_sound.set_volume(0.2)
+        # Default weapon image
+        self.weapon_surf = pygame.image.load(join('..', 'images', 'gun', 'gun.png')).convert_alpha()
+        # Default damage
+        self.damage = 30  # Увеличиваем базовый урон
 
     def shoot(self):
         if self.can_shoot:
@@ -42,6 +46,8 @@ class Pistol(Weapon):
     def __init__(self, player, groups):
         super().__init__(player, groups)
         self.cooldown = 500  # Увеличенный кулдаун для пистолета
+        self.weapon_surf = pygame.image.load(join('..', 'images', 'gun', 'gun.png')).convert_alpha()
+        self.damage = 15  # Сильный урон с одного выстрела
 
     def _create_bullets(self):
         pos = self.rect.center + self.player_direction * 50
@@ -52,6 +58,8 @@ class Shotgun(Weapon):
         super().__init__(player, groups)
         self.cooldown = 1000  # Больший кулдаун для дробовика
         self.spread = 30  # Разброс в градусах
+        self.weapon_surf = pygame.image.load(join('..', 'images', 'gun', 'drobovik.png')).convert_alpha()
+        self.damage = 20  # Меньше урон, но много пуль (5 пуль = 100 урона)
 
     def _create_bullets(self):
         base_pos = self.rect.center + self.player_direction * 50
@@ -79,6 +87,8 @@ class AutoRifle(Weapon):
     def __init__(self, player, groups):
         super().__init__(player, groups)
         self.cooldown = 100  # Очень быстрая стрельба
+        self.weapon_surf = pygame.image.load(join('..', 'images', 'gun', 'avtomat.png')).convert_alpha()
+        self.damage = 25  # Средний урон, но высокая скорострельность
 
     def _create_bullets(self):
         pos = self.rect.center + self.player_direction * 50

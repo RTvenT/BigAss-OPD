@@ -1,5 +1,6 @@
 from settings import *
 from weapons import Pistol, Shotgun, Sword, AutoRifle
+from sprites import Gun
 
 
 class Player(pygame.sprite.Sprite):
@@ -13,7 +14,7 @@ class Player(pygame.sprite.Sprite):
         self.enemy_sprites = enemy_sprites
 
         # stats
-        self.health = 100
+        self.health = 1000
         self.alive = True
         self.death_time = 0
 
@@ -31,6 +32,9 @@ class Player(pygame.sprite.Sprite):
         ]
         self.current_weapon_index = 0
         self.current_weapon = self.weapons[self.current_weapon_index]
+        
+        # Создаем визуальное представление оружия
+        self.gun = Gun(self, groups)
 
     def load_images(self):
         self.frames = {'left': [], 'right': [], 'up': [], 'down': []}
@@ -47,6 +51,8 @@ class Player(pygame.sprite.Sprite):
         if 0 <= index < len(self.weapons):
             self.current_weapon_index = index
             self.current_weapon = self.weapons[self.current_weapon_index]
+            # Обновляем изображение оружия
+            self.gun.image = self.current_weapon.weapon_surf
 
     def input(self):
         if not self.alive:
@@ -139,9 +145,15 @@ class Player(pygame.sprite.Sprite):
         self.image = self.frames[self.state][int(self.frame_index) % len(self.frames[self.state])]
 
     def update(self, dt):
+        # input
         self.input()
+        
+        # update bullet sprites
+        self.bullet_sprites.update(dt)
+        
+        # collision
         self.move(dt)
-        self.animate(dt)
+        self.bullet_collision()  # Проверяем коллизии пуль
         self.check_death()
 
         # Update weapon
@@ -154,3 +166,26 @@ class Player(pygame.sprite.Sprite):
         rect_with_offset = self.hitbox_rect.copy()
         rect_with_offset.topleft += offset
         pygame.draw.rect(surface, (255, 0, 0), rect_with_offset, 2)
+
+    def bullet_collision(self):
+        # Проверяем коллизии для каждой пули
+        for bullet in self.bullet_sprites.sprites():
+            # Проверяем коллизии с врагами
+            for enemy in self.enemy_sprites.sprites():
+                if enemy.check_bullet_collision(bullet):
+                    # Определяем тип оружия и урон
+                    weapon_damage = {
+                        'pistol': 15,  # 2 выстрела для убийства (30 HP / 15 = 2)
+                        'drobovik': 10,  # 3 пули по 10 урона каждая
+                        'avtomat': 12   # Быстрая стрельба, но меньше урон
+                    }.get(self.current_weapon, 15)
+                    
+                    print(f"Попадание из {self.current_weapon}, урон: {weapon_damage}")  # Для отладки
+                    
+                    # Наносим урон врагу
+                    enemy.take_damage(weapon_damage)
+                    
+                    # Удаляем пулю только для пистолета и автомата
+                    if self.current_weapon != 'drobovik':
+                        bullet.kill()
+                    break  # Прерываем проверку для этой пули, если попали во врага

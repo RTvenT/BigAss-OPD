@@ -96,38 +96,58 @@ class PauseMenu(BaseMenu):
             Button(center_x, 400, 200, 50, "В меню")
         ]
 
-class GameOverMenu(BaseMenu):
+class GameOverMenu:
     def __init__(self):
-        super().__init__()
-        self.title = "Игра Окончена"
-        center_x = WINDOW_WIDTH // 2 - 100
+        self.font = pygame.font.Font(None, 36)
+        self.title_font = pygame.font.Font(None, 72)
         self.buttons = [
-            Button(center_x, 300, 200, 50, "Заново"),
-            Button(center_x, 400, 200, 50, "В меню")
+            Button(WINDOW_WIDTH // 2 - 100, WINDOW_HEIGHT // 2 + 50, 200, 50, "заново"),
+            Button(WINDOW_WIDTH // 2 - 100, WINDOW_HEIGHT // 2 + 100, 200, 50, "в меню")
         ]
-        
+
+    def format_time(self, seconds):
+        """Форматирует время в MM:SS"""
+        minutes = seconds // 60
+        seconds = seconds % 60
+        return f"{minutes:02d}:{seconds:02d}"
+
     def draw(self, surface, survival_time=0, kills=0):
-        super().draw(surface)
-        # Отображаем статистику
-        stats_font = pygame.font.Font(None, 36)
-        time_text = f"Время выживания: {survival_time:.1f} сек"
+        # Заголовок
+        title_surf = self.title_font.render('GAME OVER', True, (255, 0, 0))
+        title_rect = title_surf.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 3))
+        surface.blit(title_surf, title_rect)
+
+        # Результаты
+        time_text = f"Время выживания: {self.format_time(survival_time)}"
         kills_text = f"Убито врагов: {kills}"
-        
-        # Тень для текста
-        shadow_color = (20, 0, 0)
-        time_shadow = stats_font.render(time_text, True, shadow_color)
-        kills_shadow = stats_font.render(kills_text, True, shadow_color)
-        
-        # Основной текст
-        time_surf = stats_font.render(time_text, True, (200, 0, 0))
-        kills_surf = stats_font.render(kills_text, True, (200, 0, 0))
-        
-        # Отрисовка с тенью
-        for text, shadow, y in [(time_surf, time_shadow, 150), (kills_surf, kills_shadow, 200)]:
-            shadow_rect = text.get_rect(centerx=WINDOW_WIDTH // 2 + 1, y=y + 1)
-            text_rect = text.get_rect(centerx=WINDOW_WIDTH // 2, y=y)
-            surface.blit(shadow, shadow_rect)
-            surface.blit(text, text_rect)
+
+        time_surf = self.font.render(time_text, True, (255, 255, 255))
+        kills_surf = self.font.render(kills_text, True, (255, 255, 255))
+
+        time_rect = time_surf.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2 - 50))
+        kills_rect = kills_surf.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2 - 20))
+
+        # Добавляем фон для текста
+        padding = 10
+        for text_rect in [time_rect, kills_rect]:
+            bg_rect = text_rect.inflate(padding * 2, padding * 2)
+            pygame.draw.rect(surface, (0, 0, 0), bg_rect)
+            pygame.draw.rect(surface, (40, 40, 40), bg_rect, 2)
+
+        surface.blit(time_surf, time_rect)
+        surface.blit(kills_surf, kills_rect)
+
+        # Кнопки
+        for button in self.buttons:
+            button.draw(surface)
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mouse_pos = pygame.mouse.get_pos()
+            for button in self.buttons:
+                if button.rect.collidepoint(mouse_pos):
+                    return button.text
+        return None
 
 class SettingsMenu(BaseMenu):
     def __init__(self):
