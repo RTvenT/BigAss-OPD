@@ -23,13 +23,13 @@ class Gun(pygame.sprite.Sprite):
     def __init__(self, player, groups):
         # player connection
         self.player = player
-        self.base_distance = 140  # Базовое расстояние от игрока
+        self.base_distance = 50  # Базовое расстояние от игрока
         self.distance = self.base_distance
         self.player_direction = pygame.Vector2(0, 1)
         self.target_direction = pygame.Vector2(0, 1)
         
         # Параметры плавного движения
-        self.smoothing = 0.2  # Коэффициент плавности (меньше = плавнее)
+        self.smoothing = 1  # Коэффициент плавности (меньше = плавнее)
         self.floating_offset = 0  # Смещение для эффекта "плавания"
         self.floating_speed = 3  # Скорость плавания
         self.time = 0  # Время для синусоиды
@@ -42,12 +42,22 @@ class Gun(pygame.sprite.Sprite):
     def get_direction(self):
         mouse_pos = pygame.Vector2(pygame.mouse.get_pos())
         player_pos = pygame.Vector2(WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2)
-        self.target_direction = (mouse_pos - player_pos).normalize()
-        
+        raw_direction = mouse_pos - player_pos
+
+        if raw_direction.length_squared() == 0:
+            self.target_direction = pygame.Vector2(0, -1)  # по умолчанию — вверх
+        else:
+            self.target_direction = raw_direction.normalize()
+
         # Плавное изменение направления
         direction_diff = self.target_direction - self.player_direction
         self.player_direction += direction_diff * self.smoothing
-        self.player_direction = self.player_direction.normalize()
+
+        # Если после сглаживания вектор стал нулевым (на всякий случай), тоже застрахуемся
+        if self.player_direction.length_squared() == 0:
+            self.player_direction = pygame.Vector2(0, -1)
+        else:
+            self.player_direction = self.player_direction.normalize()
 
     def update_floating(self, dt):
         # Обновляем время

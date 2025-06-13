@@ -17,7 +17,7 @@ class Weapon:
         self.shoot_sound = pygame.mixer.Sound(join('..', 'audio', 'shoot.wav'))
         self.shoot_sound.set_volume(0.2)
         # Default weapon image
-        self.weapon_surf = pygame.image.load(join('..', 'images', 'gun', 'gun.png')).convert_alpha()
+        self.weapon_surf = pygame.image.load(join('..', 'images', 'gun', 'pistol.png')).convert_alpha()
         # Default damage
         self.damage = 30
         # Расстояние появления пуль от игрока
@@ -48,7 +48,7 @@ class Pistol(Weapon):
     def __init__(self, player, groups):
         super().__init__(player, groups)
         self.cooldown = 500
-        self.weapon_surf = pygame.image.load(join('..', 'images', 'gun', 'gun.png')).convert_alpha()
+        self.weapon_surf = pygame.image.load(join('..', 'images', 'gun', 'pistol.png')).convert_alpha()
         self.damage = 15
         self.bullet_spawn_distance = 25  # Для пистолета еще ближе
 
@@ -59,9 +59,10 @@ class Pistol(Weapon):
 class Shotgun(Weapon):
     def __init__(self, player, groups):
         super().__init__(player, groups)
-        self.cooldown = 1000  # Больший кулдаун для дробовика
+        self.cooldown = 500  # Больший кулдаун для дробовика
         self.spread = 30  # Разброс в градусах
-        self.weapon_surf = pygame.image.load(join('..', 'images', 'gun', 'drobovik.png')).convert_alpha()
+        self.weapon_surf = pygame.image.load(join('..', 'images', 'gun', 'shotgun.png')).convert_alpha()
+        self.weapon_surf = pygame.transform.rotozoom(self.weapon_surf, 0, 1.2)  # Увеличим на 20%
         self.damage = 30  # Меньше урон, но много пуль (5 пуль = 100 урона)
 
     def _create_bullets(self):
@@ -90,7 +91,7 @@ class AutoRifle(Weapon):
     def __init__(self, player, groups):
         super().__init__(player, groups)
         self.cooldown = 100
-        self.weapon_surf = pygame.image.load(join('..', 'images', 'gun', 'avtomat.png')).convert_alpha()
+        self.weapon_surf = pygame.image.load(join('..', 'images', 'gun', 'auto-rifle.png')).convert_alpha()
         self.damage = 35
         self.bullet_spawn_distance = 30  # Стандартное расстояние для автомата
 

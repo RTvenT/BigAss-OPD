@@ -150,7 +150,11 @@ class Player(pygame.sprite.Sprite):
     def get_weapon_direction(self):
         mouse_pos = pygame.mouse.get_pos()
         screen_center = pygame.math.Vector2(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2)
-        return (pygame.math.Vector2(mouse_pos) - screen_center).normalize()
+        direction = pygame.math.Vector2(mouse_pos) - screen_center
+
+        if direction.length_squared() == 0:
+            return pygame.math.Vector2(0, -1)  # По умолчанию пусть смотрит вверх
+        return direction.normalize()
 
     def switch_weapon(self, index):
         if 0 <= index < len(self.weapons):

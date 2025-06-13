@@ -58,7 +58,7 @@ class Game:
         self.initial_boss_delay = True  # Флаг для первого спавна
 
         # audio 
-        self.music = pygame.mixer.Sound(join('..', 'audio', 'music.wav'))
+        self.music = pygame.mixer.Sound(join('..', 'audio', 'music1.wav'))
         self.music.set_volume(0.5)
         self.music.play(loops = -1)
         self.impact_sound = pygame.mixer.Sound(join('..', 'audio', 'impact.ogg'))
