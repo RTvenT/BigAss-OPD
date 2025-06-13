@@ -37,11 +37,14 @@ class Player(pygame.sprite.Sprite):
         self.bullet_sprites = pygame.sprite.Group()
         self.weapons = [
             Pistol(self, {'all': groups, 'bullet': self.bullet_sprites}),
-            Shotgun(self, {'all': groups, 'bullet': self.bullet_sprites}),
+            Sword(self, {'all': groups, 'bullet': self.bullet_sprites}),
             AutoRifle(self, {'all': groups, 'bullet': self.bullet_sprites})
         ]
         self.current_weapon_index = 0
         self.current_weapon = self.weapons[self.current_weapon_index]
+        # Сохраняем ссылку на all_sprites в оружии
+        for weapon in self.weapons:
+            weapon.all_sprites = groups  # Передаем сам объект groups
         self.gun = Gun(self, groups)
 
     def import_assets(self):

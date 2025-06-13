@@ -1,22 +1,27 @@
 import pygame.mouse
 import os
 import sys
+
+# Добавляем корневую директорию проекта в Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import random
 
 from settings import *
 from player import Player
 from hud import HUD
 from sprites import *
+from weapons import Sword
 from pytmx.util_pygame import load_pygame
 from groups import AllSprites
 from game_states import GameState
 from menu import MainMenu, PauseMenu, GameOverMenu, SettingsMenu
 from sprites import Boss, Enemy
+from entities.enemies.enemy_types import Bat, Slime, Skeleton
 
 from random import randint, choice
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 class Game:
     def __init__(self):
@@ -334,6 +339,10 @@ class Game:
                         enemy.draw_hitbox(self.display_surface, self.all_sprites.offset)
                         print(f"Drawing HP bar for enemy at {enemy.rect.center}")
                         enemy.draw_hp_bar(self.display_surface, self.all_sprites.offset)
+                    
+                    # Отрисовка области атаки меча
+                    if isinstance(self.player.current_weapon, Sword):
+                        self.player.current_weapon.draw_attack_area(self.display_surface)
                 
                 # Отрисовка HUD только во время игры
                 if self.player and self.hud:
@@ -355,8 +364,21 @@ class Game:
             # Выбираем случайный тип врага, кроме босса
             available_frames = {k: v for k, v in self.enemy_frames.items() if k != 'Boss'}
             if available_frames:
-                frames = choice(list(available_frames.values()))
-                Enemy(pos, frames, [self.all_sprites, self.enemy_sprites], self.player, self.collision_sprites)
+                print(f"Доступные типы врагов: {list(available_frames.keys())}")  # Отладочная информация
+                enemy_type = choice(list(available_frames.keys()))
+                frames = available_frames[enemy_type]
+                print(f"Создаем врага типа: {enemy_type}")  # Отладочная информация
+                
+                # Создаем врага соответствующего типа
+                if enemy_type == 'bat':
+                    enemy = Bat(pos, frames, [self.all_sprites, self.enemy_sprites], self.player, self.collision_sprites)
+                    print(f"Создана летучая мышь: скорость={enemy.speed}, здоровье={enemy.health}, урон={enemy.damage}")
+                elif enemy_type == 'blob':
+                    enemy = Slime(pos, frames, [self.all_sprites, self.enemy_sprites], self.player, self.collision_sprites)
+                    print(f"Создан слизень: скорость={enemy.speed}, здоровье={enemy.health}, урон={enemy.damage}")
+                else:  # skeleton или любой другой тип
+                    enemy = Skeleton(pos, frames, [self.all_sprites, self.enemy_sprites], self.player, self.collision_sprites)
+                    print(f"Создан скелет: скорость={enemy.speed}, здоровье={enemy.health}, урон={enemy.damage}")
 
 if __name__ == '__main__':
     game = Game()

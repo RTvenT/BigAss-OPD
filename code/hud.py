@@ -38,7 +38,7 @@ class HUD:
         self.weapon_slots_y = WINDOW_HEIGHT - 80  # Подняли слоты выше
         self.weapon_names = {
             'Pistol': 'Пистолет',
-            'Shotgun': 'Дробовик',
+            'Sword': 'Меч',
             'AutoRifle': 'Автомат'
         }
         print("HUD инициализирован, kills =", self.kills)  # Отладка

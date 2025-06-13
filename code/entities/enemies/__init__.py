@@ -1,0 +1,3 @@
+"""
+Enemy types package.
+""" 

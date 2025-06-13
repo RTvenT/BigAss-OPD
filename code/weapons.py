@@ -80,12 +80,111 @@ class Sword(Weapon):
     def __init__(self, player, groups):
         super().__init__(player, groups)
         self.cooldown = 400  # Быстрые атаки для меча
-        self.damage_rect = pygame.Rect(0, 0, 100, 50)  # Область урона
+        self.weapon_surf = pygame.image.load(join('..', 'images', 'gun', 'sword.png')).convert_alpha()
+        self.damage = 100  # Увеличено с 50 до 100 (убивает всех с одного удара, кроме слизня)
+        self.attack_range = 100  # Дальность атаки мечом
+        self.attack_angle = 60  # Угол атаки в градусах
+        self.attack_duration = 200  # Длительность атаки в миллисекундах
+        self.attack_start_time = 0
+        self.is_attacking = False
+        self.show_attack_area = True  # Флаг для отображения области атаки
+        self.attack_animation_duration = 200  # Длительность анимации в миллисекундах
+
+    def draw_attack_area(self, surface):
+        if not self.is_attacking:
+            return
+
+        current_time = pygame.time.get_ticks()
+        animation_progress = (current_time - self.attack_start_time) / self.attack_animation_duration
+        
+        if animation_progress > 1:
+            return
+
+        # Получаем смещение камеры из all_sprites
+        camera_offset = self.all_sprites.offset if hasattr(self.all_sprites, 'offset') else (0, 0)
+        
+        # Центр игрока с учетом смещения камеры
+        player_center = pygame.math.Vector2(self.player.rect.center) + pygame.math.Vector2(camera_offset)
+        
+        # Вычисляем углы для сектора
+        base_angle = pygame.math.Vector2().angle_to(self.player_direction)
+        start_angle = base_angle - self.attack_angle / 2
+        end_angle = base_angle + self.attack_angle / 2
+        
+        # Создаем поверхность с поддержкой прозрачности
+        attack_surface = pygame.Surface((surface.get_width(), surface.get_height()), pygame.SRCALPHA)
+        
+        # Анимируем прозрачность
+        if animation_progress < 0.3:  # Первые 30% анимации - появление
+            alpha = int(220 * (animation_progress / 0.3))
+        else:  # Оставшиеся 70% - затухание
+            alpha = int(220 * (1 - (animation_progress - 0.3) / 0.7))
+        
+        # Рисуем несколько секторов для создания эффекта волны
+        num_waves = 3  # Количество волн
+        for i in range(num_waves):
+            wave_progress = (animation_progress + i * 0.2) % 1.0  # Смещаем каждую волну
+            
+            # Вычисляем текущий радиус волны
+            current_radius = self.attack_range / 2 + (self.attack_range / 2 - self.attack_range / 4) * wave_progress
+            
+            # Рисуем сектор для текущей волны
+            points = []
+            
+            # Добавляем точки для текущей волны
+            for angle in range(int(start_angle), int(end_angle) + 1):
+                rad = radians(angle)
+                x = player_center.x + cos(rad) * current_radius
+                y = player_center.y + sin(rad) * current_radius
+                points.append((x, y))
+            
+            # Добавляем точки для внешнего края сектора
+            for angle in range(int(end_angle), int(start_angle) - 1, -1):
+                rad = radians(angle)
+                x = player_center.x + cos(rad) * (current_radius + 25)  # Увеличили ширину волны до 25 пикселей
+                y = player_center.y + sin(rad) * (current_radius + 25)
+                points.append((x, y))
+            
+            if len(points) > 2:
+                # Вычисляем прозрачность для текущей волны
+                wave_alpha = int(alpha * (1 - wave_progress * 0.7))  # Уменьшили скорость затухания
+                
+                # Рисуем волну
+                pygame.draw.polygon(attack_surface, (255, 50, 50, wave_alpha), points)
+                pygame.draw.polygon(attack_surface, (255, 100, 100, min(255, wave_alpha + 50)), points, 2)  # Увеличили толщину обводки
+        
+        surface.blit(attack_surface, (0, 0))
 
     def _create_bullets(self):
-        # Меч не создает пули, вместо этого проверяет коллизии в области удара
-        # Логика атаки будет реализована в player.py
-        pass
+        if not self.is_attacking:
+            self.is_attacking = True
+            self.attack_start_time = pygame.time.get_ticks()
+            
+            # Создаем область атаки из центра персонажа
+            attack_rect = pygame.Rect(0, 0, self.attack_range, self.attack_range)
+            player_center = pygame.math.Vector2(self.player.rect.center)
+            attack_rect.center = player_center + self.player_direction * (self.attack_range / 2)
+            
+            # Проверяем попадание по врагам
+            for enemy in self.player.enemy_sprites:
+                if attack_rect.colliderect(enemy.rect):
+                    # Проверяем, находится ли враг в пределах угла атаки
+                    enemy_dir = pygame.math.Vector2(enemy.rect.center) - player_center
+                    angle = self.player_direction.angle_to(enemy_dir)
+                    if abs(angle) <= self.attack_angle / 2:
+                        enemy.take_damage(self.damage)
+
+    def update_timer(self, cooldown):
+        current_time = pygame.time.get_ticks()
+        
+        # Проверяем окончание атаки
+        if self.is_attacking and current_time - self.attack_start_time >= self.attack_duration:
+            self.is_attacking = False
+            
+        # Проверяем кулдаун
+        if not self.can_shoot:
+            if current_time - self.shoot_time >= cooldown:
+                self.can_shoot = True
 
 class AutoRifle(Weapon):
     def __init__(self, player, groups):

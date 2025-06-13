@@ -3,6 +3,8 @@ from math import atan2, degrees, sin
 from os.path import join
 import random
 import math
+import pygame
+
 
 
 class Sprite(pygame.sprite.Sprite):
@@ -133,7 +135,6 @@ class Enemy(pygame.sprite.Sprite):
         # movement
         self.pos = pygame.math.Vector2(self.rect.center)
         self.direction = pygame.math.Vector2()
-        self.speed = 175
         
         # collisions - одинаковый хитбокс для всех врагов
         self.hitbox_rect = self.rect.inflate(-self.rect.width * 0.5, -self.rect.height * 0.5)
@@ -143,13 +144,7 @@ class Enemy(pygame.sprite.Sprite):
         self.player = player
         self.death_time = 0
         self.death_duration = 600
-        self.damage = 10
-        self.attack_cooldown = 1000
         self.last_attack = 0
-        
-        # health system
-        self.max_health = 30
-        self.health = self.max_health
         
         # Создаем круглую маску для коллизий
         self.mask_surface = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)
@@ -163,17 +158,24 @@ class Enemy(pygame.sprite.Sprite):
         self.hp_bar_height = 6  # Увеличиваем высоту
 
     def _determine_enemy_type(self):
-        """Определяем тип врага по имени файла спрайта"""
+        """Определяет тип врага по имени спрайта"""
         try:
-            image_path = self.frames[0].get_view().raw
-            if 'bat' in str(image_path).lower():
-                return 'bat'
-            elif 'slime' in str(image_path).lower():
-                return 'slime'
+            # Получаем имя файла из пути
+            sprite_name = self.image_path.split('/')[-1].lower()
+            print(f"Определяем тип врага по имени файла: {sprite_name}")  # Отладочная информация
+            
+            if 'bat' in sprite_name:
+                return 'Bat'
+            elif 'blob' in sprite_name or 'slime' in sprite_name:
+                return 'Slime'
+            elif 'skeleton' in sprite_name:
+                return 'Skeleton'
             else:
-                return 'skeleton'
-        except:
-            return 'skeleton'  # По умолчанию
+                print(f"Неизвестный тип врага: {sprite_name}")
+                return 'Skeleton'  # Возвращаем скелета как тип по умолчанию
+        except Exception as e:
+            print(f"Ошибка при определении типа врага: {e}")
+            return 'Skeleton'  # Возвращаем скелета как тип по умолчанию
 
     def update_mask(self):
         """Обновляем маску при каждом обновлении спрайта"""
@@ -503,15 +505,15 @@ class Boss(Enemy):
         super().__init__(pos, frames, groups, player, collision_sprites)
         
         # Особые характеристики босса
-        self.max_health = 300
+        self.max_health = 1000  # Увеличено с 300 до 1000
         self.health = self.max_health
-        self.speed = 150
-        self.damage = 25
-        self.attack_cooldown = 2000
+        self.speed = 150  # Оставляем прежней
+        self.damage = 50  # Увеличено с 25 до 50
+        self.attack_cooldown = 1500  # Уменьшено с 2000 до 1500 (быстрее атакует)
         
         # Увеличенная полоска HP для босса
-        self.hp_bar_width = 120  # делаем полоску пошире
-        self.hp_bar_height = 10   # и повыше
+        self.hp_bar_width = 200  # Увеличено с 120 до 200
+        self.hp_bar_height = 15   # Увеличено с 10 до 15
 
     def draw_hp_bar(self, surface, offset):
         if self.death_time == 0:  # Рисуем полоску здоровья только для живых врагов
