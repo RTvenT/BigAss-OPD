@@ -176,14 +176,12 @@ class Game:
     def bullet_collision(self):
         # Проверяем столкновения пуль с врагами
         for enemy in self.enemy_sprites:
-            for bullet in self.player.bullet_sprites:
-                if pygame.sprite.collide_mask(bullet, enemy):
-                    bullet.kill()
-                    # Наносим урон врагу
-                    print(f"Попадание! Урон: {self.player.current_weapon.damage}")  # Отладка
-                    enemy.take_damage(self.player.current_weapon.damage)
-                    print(f"Здоровье врага после урона: {enemy.health}")  # Отладка
-                    self.impact_sound.play()
+            if enemy.death_time == 0:  # Проверяем, что враг жив
+                for bullet in self.player.bullet_sprites:
+                    if pygame.sprite.collide_mask(bullet, enemy):
+                        bullet.kill()
+                        enemy.take_damage(self.player.current_weapon.damage)
+                        self.impact_sound.play()
 
     def enemy_attacks(self):
         for enemy in self.enemy_sprites:
@@ -331,8 +329,10 @@ class Game:
                     
                     # Отрисовка хитбоксов
                     self.player.draw_hitbox(self.display_surface, self.all_sprites.offset)
+                    print(f"Camera offset: {self.all_sprites.offset}")  # Отладочная информация о смещении камеры
                     for enemy in self.enemy_sprites:
                         enemy.draw_hitbox(self.display_surface, self.all_sprites.offset)
+                        print(f"Drawing HP bar for enemy at {enemy.rect.center}")
                         enemy.draw_hp_bar(self.display_surface, self.all_sprites.offset)
                 
                 # Отрисовка HUD только во время игры
