@@ -116,19 +116,22 @@ class Enemy(pygame.sprite.Sprite):
         self.original_image = self.image.copy()
         self.rect = self.image.get_frect(center=pos)
         
+        # Определяем тип врага по имени файла
+        self.enemy_type = self._determine_enemy_type()
+        
         # movement
         self.pos = pygame.math.Vector2(self.rect.center)
         self.direction = pygame.math.Vector2()
-        self.speed = 125
+        self.speed = 175
         
-        # collisions
+        # collisions - одинаковый хитбокс для всех врагов
         self.hitbox_rect = self.rect.inflate(-self.rect.width * 0.5, -self.rect.height * 0.5)
         self.collision_sprites = collision_sprites
         
         # player interaction
         self.player = player
         self.death_time = 0
-        self.death_duration = 400
+        self.death_duration = 600
         self.damage = 10
         self.attack_cooldown = 1000
         self.last_attack = 0
@@ -144,12 +147,22 @@ class Enemy(pygame.sprite.Sprite):
                          min(self.rect.width, self.rect.height) // 2)
         self.mask = pygame.mask.from_surface(self.mask_surface)
         
-        # HP bar settings
-        self.hp_bar_width = 40
-        self.hp_bar_height = 4
-        self.hp_bar_red = (200, 0, 0)
-        self.hp_bar_green = (0, 200, 0)
-        self.hp_bar_bg = (60, 60, 60)
+        # HP bar
+        self.hp_bar_width = 32
+        self.hp_bar_height = 3
+
+    def _determine_enemy_type(self):
+        """Определяем тип врага по имени файла спрайта"""
+        try:
+            image_path = self.frames[0].get_view().raw
+            if 'bat' in str(image_path).lower():
+                return 'bat'
+            elif 'slime' in str(image_path).lower():
+                return 'slime'
+            else:
+                return 'skeleton'
+        except:
+            return 'skeleton'  # По умолчанию
 
     def update_mask(self):
         """Обновляем маску при каждом обновлении спрайта"""
@@ -158,13 +171,17 @@ class Enemy(pygame.sprite.Sprite):
 
     def check_bullet_collision(self, bullet):
         """Проверяем попадание пули с использованием маски"""
-        if not self.death_time:  # Проверяем только живых врагов
+        if not self.death_time:
             # Получаем относительное смещение между пулей и врагом
             offset_x = bullet.rect.x - self.rect.x
             offset_y = bullet.rect.y - self.rect.y
             
+            # Создаем маску для текущего кадра
+            self.mask = pygame.mask.from_surface(self.image)
+            bullet_mask = pygame.mask.from_surface(bullet.image)
+            
             # Проверяем пересечение масок
-            if self.mask.overlap(bullet.mask, (offset_x, offset_y)):
+            if self.mask.overlap(bullet_mask, (offset_x, offset_y)):
                 return True
         return False
 
@@ -236,30 +253,23 @@ class Enemy(pygame.sprite.Sprite):
                     self.hitbox_rect.top = self.player.hitbox_rect.bottom
 
     def draw_hp_bar(self, surface, offset):
-        """Отрисовка полоски здоровья"""
-        if self.death_time == 0:  # Рисуем только если враг жив
+        if self.death_time == 0:
             # Позиция полоски HP над врагом
             bar_pos = pygame.math.Vector2(
                 self.rect.centerx - self.hp_bar_width // 2,
-                self.rect.top - 10
+                self.rect.top - 8
             ) - offset
             
-            # Фон полоски
-            bg_rect = pygame.Rect(bar_pos, (self.hp_bar_width, self.hp_bar_height))
-            pygame.draw.rect(surface, self.hp_bar_bg, bg_rect)
+            # Черная обводка
+            pygame.draw.rect(surface, (0, 0, 0), 
+                           (bar_pos.x - 1, bar_pos.y - 1, 
+                            self.hp_bar_width + 2, self.hp_bar_height + 2))
             
-            # Заполненная часть полоски
-            health_ratio = self.health / self.max_health
-            health_width = int(self.hp_bar_width * health_ratio)
-            health_rect = pygame.Rect(bar_pos, (health_width, self.hp_bar_height))
-            
-            # Выбираем цвет в зависимости от количества здоровья
-            if health_ratio > 0.7:
-                color = self.hp_bar_green
-            else:
-                color = self.hp_bar_red
-            
-            pygame.draw.rect(surface, color, health_rect)
+            # Зеленая полоска здоровья
+            health_width = int(self.hp_bar_width * (self.health / self.max_health))
+            if health_width > 0:
+                pygame.draw.rect(surface, (0, 255, 0), 
+                               (bar_pos.x, bar_pos.y, health_width, self.hp_bar_height))
 
     def take_damage(self, amount):
         """Получение урона"""
@@ -272,27 +282,35 @@ class Enemy(pygame.sprite.Sprite):
                 self.destroy()
 
     def destroy(self):
-        """Создаем эффект облачка при смерти"""
+        """Создаем эффект силуэта при смерти"""
         if self.death_time == 0:
             self.death_time = pygame.time.get_ticks()
             try:
-                # Создаем маску из оригинального изображения
-                mask = pygame.mask.from_surface(self.original_image)
-                # Создаем поверхность для силуэта
-                death_surf = mask.to_surface()
-                # Заменяем черный цвет на прозрачный
-                death_surf.set_colorkey((0, 0, 0))
-                # Делаем все непрозрачные пиксели белыми
-                death_surf_array = pygame.surfarray.pixels3d(death_surf)
-                white = (255, 255, 255)
-                death_surf_array[...] = white
-                del death_surf_array  # Освобождаем память
+                # Создаем маску из текущего изображения врага
+                mask = pygame.mask.from_surface(self.image)
+                # Создаем поверхность для силуэта точно такого же размера
+                death_surf = pygame.Surface(self.image.get_size(), pygame.SRCALPHA)
                 
-                self.image = death_surf
+                # Получаем контур маски
+                outline = mask.outline()
+                if outline:
+                    # Заполняем внутреннюю часть белым цветом
+                    pygame.draw.polygon(death_surf, (255, 255, 255, 180), outline)
+                    
+                # Создаем точную копию спрайта в белом цвете
+                sprite_surf = mask.to_surface(setcolor=(255, 255, 255, 180), unsetcolor=(0, 0, 0, 0))
+                death_surf.blit(sprite_surf, (0, 0))
+                
+                # Сохраняем изображение для анимации
+                self.death_image = death_surf
+                self.image = self.death_image
+                
             except Exception as e:
                 print(f"Ошибка при создании эффекта смерти: {e}")
-                self.image = self.original_image.copy()
-                self.image.fill((255, 255, 255, 255), special_flags=pygame.BLEND_RGBA_MULT)
+                # Если что-то пошло не так, просто делаем спрайт белым
+                self.death_image = self.image.copy()
+                self.death_image.fill((255, 255, 255, 180))
+                self.image = self.death_image
 
     def death_timer(self):
         """Обработка анимации смерти"""
@@ -301,11 +319,14 @@ class Enemy(pygame.sprite.Sprite):
             if current_time - self.death_time >= self.death_duration:
                 self.kill()
             else:
-                # Делаем облачко постепенно прозрачным
+                # Вычисляем прогресс анимации смерти
                 progress = (current_time - self.death_time) / self.death_duration
+                
+                # Плавное затухание
                 alpha = int(255 * (1 - progress))
-                # Создаем новую поверхность с нужной прозрачностью
-                new_image = self.image.copy()
+                
+                # Создаем новое изображение с текущей прозрачностью
+                new_image = self.death_image.copy()
                 new_image.fill((255, 255, 255, alpha), special_flags=pygame.BLEND_RGBA_MULT)
                 self.image = new_image
 
@@ -329,62 +350,50 @@ class Boss(Enemy):
         # Загружаем изображение босса
         self.boss_image = pygame.image.load(join('..', 'images', 'enemies', 'Boss', 'Boss_Tim.png')).convert_alpha()
         # Устанавливаем размер босса
-        self.boss_image = pygame.transform.scale(self.boss_image, (96, 96))  # Увеличиваем до 96x96 пикселей
-        frames = [self.boss_image]  # Пока используем одно изображение
+        self.boss_image = pygame.transform.scale(self.boss_image, (128, 128))
+        frames = [self.boss_image]
+        
+        # Загружаем иконку босса
+        try:
+            self.icon = pygame.image.load(join('..', 'images', 'enemies', 'Boss', 'boss_icon.png')).convert_alpha()
+            self.icon = pygame.transform.scale(self.icon, (16, 16))  # делаем иконку совсем маленькой
+        except:
+            print("Не удалось загрузить иконку босса")
+            self.icon = None
         
         super().__init__(pos, frames, groups, player, collision_sprites)
         
         # Особые характеристики босса
-        self.max_health = 300  # Уменьшаем здоровье босса, но оставляем больше чем у обычных врагов
+        self.max_health = 300
         self.health = self.max_health
-        self.speed = 150  # Немного медленнее обычных врагов
-        self.damage = 25  # Увеличенный урон
-        self.attack_cooldown = 2000  # Более долгий кулдаун атаки
+        self.speed = 150
+        self.damage = 25
+        self.attack_cooldown = 2000
         
-        # Увеличиваем размер хитбокса для босса
-        self.rect = self.image.get_frect(center=pos)
-        self.hitbox_rect = self.rect.inflate(-30, -40)  # Хитбокс немного меньше спрайта
-
         # Увеличенная полоска HP для босса
-        self.hp_bar_width = 100  # Делаем полоску HP шире
-        self.hp_bar_height = 10  # И выше
-        self.hp_bar_red = (200, 0, 0)
-        self.hp_bar_green = (0, 200, 0)
+        self.hp_bar_width = 100  # делаем полоску пошире
+        self.hp_bar_height = 8   # и повыше
 
-        # Создаем индикатор спавна
-        self.spawn_indicator_radius = 50
-        self.spawn_indicator_color = (255, 0, 0)
-        self.spawn_indicator_surface = pygame.Surface((self.spawn_indicator_radius * 2, self.spawn_indicator_radius * 2), pygame.SRCALPHA)
-        pygame.draw.circle(self.spawn_indicator_surface, (*self.spawn_indicator_color, 128), 
-                         (self.spawn_indicator_radius, self.spawn_indicator_radius), self.spawn_indicator_radius)
-        self.spawn_indicator_rect = self.spawn_indicator_surface.get_rect(center=pos)
-        self.spawn_indicator_time = 2000  # 2 секунды
-        self.spawn_time = pygame.time.get_ticks()
-
-    def take_damage(self, amount):
-        """Метод для получения урона"""
-        self.health -= amount
-        if self.health <= 0 and self.death_time == 0:
-            # Увеличиваем счетчик убийств до уничтожения
-            if hasattr(self.player, 'hud'):
-                # Даем 3 очка за убийство босса
-                for _ in range(3):
-                    self.player.hud.add_kill()
-                print(f"Босс уничтожен! Текущий счет: {self.player.hud.kills}")  # Отладка
-            # Уничтожаем босса
-            self.destroy()
-
-    def update(self, dt):
+    def draw_hp_bar(self, surface, offset):
         if self.death_time == 0:
-            self.move(dt)
-            self.animate(dt)
-            # Атакуем игрока
-            self.attack()
+            # Позиция полоски HP над врагом
+            bar_pos = pygame.math.Vector2(
+                self.rect.centerx - self.hp_bar_width // 2,
+                self.rect.top - 12  # поднимаем повыше из-за иконки
+            ) - offset
             
-            # Обновляем индикатор спавна
-            current_time = pygame.time.get_ticks()
-            if current_time - self.spawn_time < self.spawn_indicator_time:
-                self.spawn_indicator_rect.center = self.rect.center
-                self.groups()[0].display_surface.blit(self.spawn_indicator_surface, self.spawn_indicator_rect)
-        else:
-            self.death_timer()
+            # Рисуем иконку над полоской здоровья
+            if self.icon:
+                icon_pos = (bar_pos.x + self.hp_bar_width // 2 - 8, bar_pos.y - 20)  # центрируем иконку
+                surface.blit(self.icon, icon_pos)
+            
+            # Черная обводка
+            pygame.draw.rect(surface, (0, 0, 0), 
+                           (bar_pos.x - 1, bar_pos.y - 1, 
+                            self.hp_bar_width + 2, self.hp_bar_height + 2))
+            
+            # Зеленая полоска здоровья
+            health_width = int(self.hp_bar_width * (self.health / self.max_health))
+            if health_width > 0:
+                pygame.draw.rect(surface, (0, 255, 0), 
+                               (bar_pos.x, bar_pos.y, health_width, self.hp_bar_height))
