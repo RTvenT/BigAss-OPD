@@ -7,7 +7,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import random
 
-from settings import *
+from settings import WINDOW_WIDTH, WINDOW_HEIGHT, TILE_SIZE, load_settings, save_settings
 from player import Player
 from hud import HUD
 from sprites import *
@@ -31,6 +31,9 @@ class Game:
         pygame.display.set_caption('Survivor')
         self.clock = pygame.time.Clock()
         self.running = True
+
+        # Загружаем настройки звука
+        self.music_volume, self.sound_volume = load_settings()
 
         # Состояние игры
         self.state = GameState.MAIN_MENU
@@ -64,10 +67,10 @@ class Game:
 
         # audio 
         self.music = pygame.mixer.Sound(join('..', 'audio', 'music1.wav'))
-        self.music.set_volume(0.5)
+        self.music.set_volume(self.music_volume)
         self.music.play(loops = -1)
         self.impact_sound = pygame.mixer.Sound(join('..', 'audio', 'impact.ogg'))
-        self.impact_sound.set_volume(0.3)
+        self.impact_sound.set_volume(self.sound_volume)
 
         # Изображения (загружаем один раз)
         self.load_images()
@@ -201,6 +204,7 @@ class Game:
                 self.init_game()
                 pygame.mouse.set_visible(False)
             elif result == "настройки":
+                self._prev_state = self.state  # Сохраняем предыдущее состояние
                 self.state = GameState.SETTINGS
             elif result == "выход":
                 self.running = False
@@ -211,6 +215,7 @@ class Game:
                 self.state = GameState.PLAYING
                 pygame.mouse.set_visible(False)
             elif result == "настройки":
+                self._prev_state = self.state  # Сохраняем предыдущее состояние
                 self.state = GameState.SETTINGS
             elif result == "в меню":
                 self.state = GameState.MAIN_MENU
@@ -235,7 +240,11 @@ class Game:
                 else:
                     self.state = GameState.MAIN_MENU
             # Применяем настройки громкости
-            self.music.set_volume(self.settings_menu.music_volume)
+            self.music.set_volume(self.settings_menu.music_slider.value)
+            self.impact_sound.set_volume(self.settings_menu.sound_slider.value)
+            # Сохраняем настройки
+            save_settings(self.settings_menu.music_slider.value, 
+                         self.settings_menu.sound_slider.value)
 
     def spawn_boss(self):
         """Спавн босса недалеко от игрока"""

@@ -40,6 +40,57 @@ class Button:
                 return True
         return False
 
+class Slider:
+    def __init__(self, x, y, width, height, min_val=0, max_val=1, initial_val=0.5):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.min_val = min_val
+        self.max_val = max_val
+        self.value = initial_val
+        self.dragging = False
+        self.handle_radius = height // 2
+        self.handle_pos = self._value_to_pos(initial_val)
+        
+    def _value_to_pos(self, value):
+        return self.rect.x + (value - self.min_val) / (self.max_val - self.min_val) * self.rect.width
+        
+    def _pos_to_value(self, pos):
+        value = (pos - self.rect.x) / self.rect.width * (self.max_val - self.min_val) + self.min_val
+        return max(self.min_val, min(self.max_val, value))
+        
+    def draw(self, surface):
+        # Рисуем линию слайдера
+        pygame.draw.line(surface, (100, 100, 100), 
+                        (self.rect.x, self.rect.centery),
+                        (self.rect.right, self.rect.centery), 2)
+        
+        # Рисуем ползунок
+        pygame.draw.circle(surface, (150, 0, 0), 
+                         (int(self.handle_pos), self.rect.centery), 
+                         self.handle_radius)
+        
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1:
+                handle_rect = pygame.Rect(
+                    self.handle_pos - self.handle_radius,
+                    self.rect.centery - self.handle_radius,
+                    self.handle_radius * 2,
+                    self.handle_radius * 2
+                )
+                if handle_rect.collidepoint(event.pos):
+                    self.dragging = True
+                    
+        elif event.type == pygame.MOUSEBUTTONUP:
+            if event.button == 1:
+                self.dragging = False
+                
+        elif event.type == pygame.MOUSEMOTION and self.dragging:
+            self.handle_pos = max(self.rect.x, min(self.rect.right, event.pos[0]))
+            self.value = self._pos_to_value(self.handle_pos)
+            return True
+            
+        return False
+
 class BaseMenu:
     def __init__(self):
         self.buttons = []
@@ -153,10 +204,50 @@ class SettingsMenu(BaseMenu):
     def __init__(self):
         super().__init__()
         self.title = "Настройки"
-        center_x = WINDOW_WIDTH // 2 - 100
+        center_x = WINDOW_WIDTH // 2 - 150
+        
+        # Загружаем сохраненные настройки
+        music_volume, sound_volume = load_settings()
+        
+        # Создаем слайдеры с сохраненными значениями
+        self.music_slider = Slider(center_x, 200, 300, 20, initial_val=music_volume)
+        self.sound_slider = Slider(center_x, 300, 300, 20, initial_val=sound_volume)
+        
+        # Создаем текст для слайдеров
+        self.font = pygame.font.Font(None, 36)
+        
         self.buttons = [
             Button(center_x, 400, 200, 50, "Назад")
         ]
-        # Настройки звука
-        self.music_volume = 0.5
-        self.sound_volume = 0.2
+        
+    def draw(self, surface):
+        super().draw(surface)
+        
+        # Рисуем текст для слайдеров
+        music_text = self.font.render("Громкость музыки", True, (200, 200, 200))
+        sound_text = self.font.render("Громкость эффектов", True, (200, 200, 200))
+        
+        surface.blit(music_text, (self.music_slider.rect.x, self.music_slider.rect.y - 30))
+        surface.blit(sound_text, (self.sound_slider.rect.x, self.sound_slider.rect.y - 30))
+        
+        # Рисуем слайдеры
+        self.music_slider.draw(surface)
+        self.sound_slider.draw(surface)
+        
+    def handle_event(self, event):
+        # Обрабатываем события слайдеров
+        if self.music_slider.handle_event(event):
+            pygame.mixer.music.set_volume(self.music_slider.value)
+            # Сохраняем настройки при изменении
+            save_settings(self.music_slider.value, self.sound_slider.value)
+            
+        if self.sound_slider.handle_event(event):
+            # Здесь нужно будет обновить громкость звуковых эффектов
+            # Сохраняем настройки при изменении
+            save_settings(self.music_slider.value, self.sound_slider.value)
+            
+        # Обрабатываем события кнопок
+        for button in self.buttons:
+            if button.handle_event(event):
+                return button.text.lower()
+        return None
