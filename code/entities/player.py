@@ -6,8 +6,11 @@ from core import WINDOW_WIDTH, WINDOW_HEIGHT
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, pos, groups, collision_sprites, enemy_sprites):
+    def __init__(self, pos, groups, collision_sprites, enemy_sprites, game=None):
         super().__init__(groups)
+        
+        # Сохраняем ссылку на игру
+        self.game = game
         
         # animation setup
         self.import_assets()

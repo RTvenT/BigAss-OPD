@@ -34,6 +34,18 @@ class Boss(Enemy):
         # Увеличенная полоска HP для босса
         self.hp_bar_width = 200  # Увеличено с 120 до 200
         self.hp_bar_height = 15   # Увеличено с 10 до 15
+        
+        # Применяем множители сложности
+        difficulty = self.player.game.difficulty if hasattr(self.player, 'game') else 1
+        difficulty_multipliers = {
+            0: {'health': 0.5, 'damage': 0.5},  # Легко
+            1: {'health': 1.0, 'damage': 1.0},  # Средне
+            2: {'health': 1.5, 'damage': 2.0}   # Сложно
+        }
+        
+        self.health = int(self.health * difficulty_multipliers[difficulty]['health'])
+        self.max_health = self.health
+        self.damage = int(self.damage * difficulty_multipliers[difficulty]['damage'])
 
     def draw_hp_bar(self, surface, offset):
         if self.death_time == 0:  # Рисуем полоску здоровья только для живых врагов

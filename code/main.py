@@ -49,6 +49,25 @@ class Game:
         # Параметры игры
         self.difficulty = 1  # 0-Легко, 1-Средне, 2-Сложно
         self.selected_map = 0  # 0-Первая карта, 1-Вторая карта
+        
+        # Коэффициенты сложности
+        self.difficulty_multipliers = {
+            0: {  # Легко
+                'health': 0.5,  # 50% от средней
+                'damage': 0.5,  # 50% от средней
+                'spawn_rate': 0.33  # В 3 раза реже
+            },
+            1: {  # Средне (базовые значения)
+                'health': 1.0,
+                'damage': 1.0,
+                'spawn_rate': 1.0
+            },
+            2: {  # Сложно
+                'health': 1.5,  # 150% от средней
+                'damage': 2.0,  # 200% от средней
+                'spawn_rate': 2.0  # В 2 раза чаще
+            }
+        }
 
         # crosshair
         self.crosshair_image = pygame.image.load(join('..', 'images', 'ui', 'crosshair.png')).convert_alpha()
@@ -161,7 +180,8 @@ class Game:
                     (obj.x, obj.y),
                     [self.all_sprites],
                     self.collision_sprites,
-                    self.enemy_sprites
+                    self.enemy_sprites,
+                    self  # Передаем ссылку на игру
                 )
                 # Присваиваем HUD игроку
                 self.player.hud = self.hud
@@ -378,6 +398,10 @@ class Game:
     def spawn_enemies(self):
         """Спавн обычных врагов"""
         if self.spawn_positions and self.enemy_frames:
+            # Проверяем шанс спавна в зависимости от сложности
+            if random.random() > self.difficulty_multipliers[self.difficulty]['spawn_rate']:
+                return
+                
             pos = choice(self.spawn_positions)
             # Выбираем случайный тип врага, кроме босса
             available_frames = {k: v for k, v in self.enemy_frames.items() if k != 'Boss'}
@@ -397,6 +421,11 @@ class Game:
                 else:  # skeleton или любой другой тип
                     enemy = Skeleton(pos, frames, [self.all_sprites, self.enemy_sprites], self.player, self.collision_sprites)
                     print(f"Создан скелет: скорость={enemy.speed}, здоровье={enemy.health}, урон={enemy.damage}")
+                
+                # Применяем множители сложности
+                enemy.health = int(enemy.health * self.difficulty_multipliers[self.difficulty]['health'])
+                enemy.max_health = enemy.health
+                enemy.damage = int(enemy.damage * self.difficulty_multipliers[self.difficulty]['damage'])
 
 if __name__ == '__main__':
     game = Game()
