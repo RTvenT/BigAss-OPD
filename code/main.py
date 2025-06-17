@@ -1,25 +1,25 @@
 import pygame.mouse
 import os
 import sys
+from os.path import join
+from os import walk
 
 # Добавляем корневую директорию проекта в Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import random
+from random import randint, choice
 
-from settings import WINDOW_WIDTH, WINDOW_HEIGHT, TILE_SIZE, load_settings, save_settings
-from player import Player
-from hud import HUD
-from sprites import *
+from core import (
+    WINDOW_WIDTH, WINDOW_HEIGHT, TILE_SIZE,
+    load_settings, save_settings, GameState
+)
+from sprites import Sprite, CollisionSprite, AllSprites
 from weapons import Sword
 from pytmx.util_pygame import load_pygame
-from groups import AllSprites
-from game_states import GameState
-from menu import MainMenu, PauseMenu, GameOverMenu, SettingsMenu
-from sprites import Boss, Enemy
-from entities.enemies.enemy_types import Bat, Slime, Skeleton
+from entities import Player, Boss, Bat, Slime, Skeleton
+from ui import HUD, MainMenu, PauseMenu, GameOverMenu, SettingsMenu
 
-from random import randint, choice
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 

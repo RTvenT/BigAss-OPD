@@ -1,32 +1,32 @@
-"""
-Game settings and configuration.
-"""
-import pygame
+import pygame 
+import json
+import os
 from os.path import join
-from os import walk
 
-# Window settings
-WINDOW_WIDTH = 1280
-WINDOW_HEIGHT = 720
+WINDOW_WIDTH, WINDOW_HEIGHT = 1280,720 
 TILE_SIZE = 64
 
-# Game settings
-FPS = 60
-GAME_TITLE = "Vampire Survivor"
+# Настройки звука по умолчанию
+DEFAULT_MUSIC_VOLUME = 0.5
+DEFAULT_SOUND_VOLUME = 0.5
 
-# Asset paths
-ASSET_DIR = "assets"
-IMAGE_DIR = join(ASSET_DIR, "images")
-AUDIO_DIR = join(ASSET_DIR, "audio")
+def load_settings():
+    try:
+        settings_path = join(os.path.dirname(os.path.dirname(__file__)), 'data', 'settings.json')
+        with open(settings_path, 'r') as f:
+            settings = json.load(f)
+            return settings.get('music_volume', DEFAULT_MUSIC_VOLUME), \
+                   settings.get('sound_volume', DEFAULT_SOUND_VOLUME)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return DEFAULT_MUSIC_VOLUME, DEFAULT_SOUND_VOLUME
 
-# Player settings
-PLAYER_SPEED = 5
-PLAYER_HEALTH = 100
-
-# Enemy settings
-ENEMY_SPAWN_RATE = 1.0  # enemies per second
-ENEMY_SPEED = 3
-
-# Weapon settings
-WEAPON_COOLDOWN = 0.5  # seconds 
- 
+def save_settings(music_volume, sound_volume):
+    settings = {
+        'music_volume': music_volume,
+        'sound_volume': sound_volume
+    }
+    settings_path = join(os.path.dirname(os.path.dirname(__file__)), 'data', 'settings.json')
+    # Создаем директорию, если она не существует
+    os.makedirs(os.path.dirname(settings_path), exist_ok=True)
+    with open(settings_path, 'w') as f:
+        json.dump(settings, f)
