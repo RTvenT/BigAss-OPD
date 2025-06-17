@@ -130,7 +130,7 @@ class Game:
             self.hud.reset()  # Сбрасываем таймеры
 
     def setup(self):
-        map = load_pygame(join('..', 'data', 'maps', 'world.tmx'))
+        map = load_pygame(join('..', 'data', 'maps', 'world1.tmx'))
 
         for x, y, image in map.get_layer_by_name('Ground').tiles():
             Sprite((x * TILE_SIZE,y * TILE_SIZE), image, self.all_sprites)
