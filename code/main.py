@@ -18,7 +18,7 @@ from sprites import Sprite, CollisionSprite, AllSprites
 from weapons import Sword
 from pytmx.util_pygame import load_pygame
 from entities import Player, Boss, Bat, Slime, Skeleton
-from ui import HUD, MainMenu, PauseMenu, GameOverMenu, SettingsMenu
+from ui import HUD, MainMenu, PauseMenu, GameOverMenu, SettingsMenu, GameParamsMenu
 
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -44,6 +44,11 @@ class Game:
         self.pause_menu = PauseMenu()
         self.game_over_menu = GameOverMenu()
         self.settings_menu = SettingsMenu()
+        self.game_params_menu = GameParamsMenu()
+
+        # Параметры игры
+        self.difficulty = 1  # 0-Легко, 1-Средне, 2-Сложно
+        self.selected_map = 0  # 0-Первая карта, 1-Вторая карта
 
         # crosshair
         self.crosshair_image = pygame.image.load(join('..', 'images', 'ui', 'crosshair.png')).convert_alpha()
@@ -130,32 +135,36 @@ class Game:
             self.hud.reset()  # Сбрасываем таймеры
 
     def setup(self):
-        map = load_pygame(join('..', 'data', 'maps', 'world1.tmx'))
-
-        for x, y, image in map.get_layer_by_name('Ground').tiles():
-            Sprite((x * TILE_SIZE,y * TILE_SIZE), image, self.all_sprites)
-        
-        for obj in map.get_layer_by_name('Objects'):
-            CollisionSprite((obj.x, obj.y), obj.image, (self.all_sprites, self.collision_sprites))
-        
-        for obj in map.get_layer_by_name('Collisions'):
-            CollisionSprite((obj.x, obj.y), pygame.Surface((obj.width, obj.height)), self.collision_sprites)
-
+        """Настройка игровых объектов"""
         # Создаем HUD до создания игрока
         self.hud = HUD()
-        print("HUD создан!")  # Отладка
-
-        for obj in map.get_layer_by_name('Entities'):
+        
+        # Загружаем карту в зависимости от выбора
+        map_file = 'world1.tmx' if self.selected_map == 0 else 'world2.tmx'
+        tmx_data = load_pygame(join('..', 'data', 'maps', map_file))
+        
+        # Создаем тайлы
+        for x, y, surf in tmx_data.get_layer_by_name('Ground').tiles():
+            pos = (x * TILE_SIZE, y * TILE_SIZE)
+            Sprite(pos, surf, [self.all_sprites])
+            
+        for obj in tmx_data.get_layer_by_name('Objects'):
+            CollisionSprite((obj.x, obj.y), obj.image, (self.all_sprites, self.collision_sprites))
+        
+        for obj in tmx_data.get_layer_by_name('Collisions'):
+            CollisionSprite((obj.x, obj.y), pygame.Surface((obj.width, obj.height)), self.collision_sprites)
+            
+        # Создаем игрока
+        for obj in tmx_data.get_layer_by_name('Entities'):
             if obj.name == 'Player':
                 self.player = Player(
-                    (obj.x,obj.y), 
-                    self.all_sprites, 
-                    self.collision_sprites, 
+                    (obj.x, obj.y),
+                    [self.all_sprites],
+                    self.collision_sprites,
                     self.enemy_sprites
                 )
                 # Присваиваем HUD игроку
                 self.player.hud = self.hud
-                print("HUD присвоен игроку!")  # Отладка
             else:
                 pos = (obj.x, obj.y)
                 # Проверка расстояния
@@ -200,14 +209,21 @@ class Game:
         if self.state == GameState.MAIN_MENU:
             result = self.main_menu.handle_event(event)
             if result == "играть":
-                self.state = GameState.PLAYING
-                self.init_game()
-                pygame.mouse.set_visible(False)
+                self.state = GameState.GAME_PARAMS
             elif result == "настройки":
-                self._prev_state = self.state  # Сохраняем предыдущее состояние
+                self._prev_state = self.state
                 self.state = GameState.SETTINGS
             elif result == "выход":
                 self.running = False
+                
+        elif self.state == GameState.GAME_PARAMS:
+            result = self.game_params_menu.handle_event(event)
+            if result == "play":
+                self.difficulty = self.game_params_menu.selected_difficulty
+                self.selected_map = self.game_params_menu.selected_map
+                self.state = GameState.PLAYING
+                self.init_game()
+                pygame.mouse.set_visible(False)
                 
         elif self.state == GameState.PAUSED:
             result = self.pause_menu.handle_event(event)
@@ -215,7 +231,7 @@ class Game:
                 self.state = GameState.PLAYING
                 pygame.mouse.set_visible(False)
             elif result == "настройки":
-                self._prev_state = self.state  # Сохраняем предыдущее состояние
+                self._prev_state = self.state
                 self.state = GameState.SETTINGS
             elif result == "в меню":
                 self.state = GameState.MAIN_MENU
@@ -224,9 +240,7 @@ class Game:
         elif self.state == GameState.GAME_OVER:
             result = self.game_over_menu.handle_event(event)
             if result == "заново":
-                self.state = GameState.PLAYING
-                self.init_game()
-                pygame.mouse.set_visible(False)
+                self.state = GameState.GAME_PARAMS
             elif result == "в меню":
                 self.state = GameState.MAIN_MENU
                 pygame.mouse.set_visible(True)
@@ -234,15 +248,12 @@ class Game:
         elif self.state == GameState.SETTINGS:
             result = self.settings_menu.handle_event(event)
             if result == "назад":
-                # Возвращаемся в предыдущее состояние
                 if hasattr(self, '_prev_state'):
                     self.state = self._prev_state
                 else:
                     self.state = GameState.MAIN_MENU
-            # Применяем настройки громкости
             self.music.set_volume(self.settings_menu.music_slider.value)
             self.impact_sound.set_volume(self.settings_menu.sound_slider.value)
-            # Сохраняем настройки
             save_settings(self.settings_menu.music_slider.value, 
                          self.settings_menu.sound_slider.value)
 
@@ -298,13 +309,9 @@ class Game:
                             pygame.mouse.set_visible(False)
 
                 # Обработка событий меню
-                if self.state == GameState.MAIN_MENU:
-                    self.handle_menu_events(event)
-                elif self.state == GameState.PAUSED:
-                    self.handle_menu_events(event)
-                elif self.state == GameState.GAME_OVER:
-                    self.handle_menu_events(event)
-                elif self.state == GameState.SETTINGS:
+                if self.state in [GameState.MAIN_MENU, GameState.PAUSED, 
+                                GameState.GAME_OVER, GameState.SETTINGS,
+                                GameState.GAME_PARAMS]:
                     self.handle_menu_events(event)
                 elif self.state == GameState.PLAYING:
                     if event.type == self.enemy_event:
@@ -314,6 +321,9 @@ class Game:
             if self.state == GameState.MAIN_MENU:
                 self.display_surface.fill('black')
                 self.main_menu.draw(self.display_surface)
+            elif self.state == GameState.GAME_PARAMS:
+                self.display_surface.fill('black')
+                self.game_params_menu.draw(self.display_surface)
             elif self.state == GameState.PAUSED:
                 # Сначала рисуем игру
                 if self.player and self.all_sprites:
@@ -323,7 +333,6 @@ class Game:
                 self.pause_menu.draw(self.display_surface)
             elif self.state == GameState.GAME_OVER:
                 self.display_surface.fill('black')
-                # Передаем сохраненные результаты
                 self.game_over_menu.draw(self.display_surface, self.final_time, self.final_kills)
             elif self.state == GameState.SETTINGS:
                 self.display_surface.fill('black')

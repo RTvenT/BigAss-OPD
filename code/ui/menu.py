@@ -1,5 +1,7 @@
 import pygame
-
+import math
+import os
+from os.path import join
 from core import *
 
 
@@ -252,4 +254,125 @@ class SettingsMenu(BaseMenu):
         for button in self.buttons:
             if button.handle_event(event):
                 return button.text.lower()
+        return None
+
+class GameParamsMenu(BaseMenu):
+    def __init__(self):
+        super().__init__()
+        self.title = "Параметры игры"
+        
+        # Позиции и размеры элементов
+        center_x = WINDOW_WIDTH // 2
+        button_width = 200
+        button_height = 50
+        map_preview_size = 200
+        map_gap = 50
+        
+        # Кнопки выбора сложности (увеличиваем расстояние между ними)
+        self.difficulty_buttons = [
+            Button(center_x - button_width//2 - 220, 200, button_width, button_height, "Легко"),
+            Button(center_x - button_width//2, 200, button_width, button_height, "Средне"),
+            Button(center_x + button_width//2 + 20, 200, button_width, button_height, "Сложно")
+        ]
+        self.selected_difficulty = 1  # Индекс выбранной сложности (0-Легко, 1-Средне, 2-Сложно)
+        
+        # Превью карт
+        self.map_previews = [
+            pygame.Rect(center_x - map_preview_size - map_gap//2, 300, map_preview_size, map_preview_size),
+            pygame.Rect(center_x + map_gap//2, 300, map_preview_size, map_preview_size)
+        ]
+        self.selected_map = 0  # Индекс выбранной карты
+        
+        # Кнопка "Играть"
+        self.play_button = Button(center_x - button_width//2, 550, button_width, button_height, "Играть")
+        
+        # Загрузка превью карт
+        self.map_images = []
+        try:
+            # Используем правильные пути к файлам
+            map1_path = join('images', 'maps', 'map1_preview.png')
+            map2_path = join('images', 'maps', 'map2_preview.png')
+            
+            if os.path.exists(map1_path) and os.path.exists(map2_path):
+                # Загружаем и масштабируем изображения
+                map1 = pygame.image.load(map1_path).convert_alpha()
+                map2 = pygame.image.load(map2_path).convert_alpha()
+                
+                # Масштабируем изображения до размера превью
+                self.map_images = [
+                    pygame.transform.scale(map1, (map_preview_size, map_preview_size)),
+                    pygame.transform.scale(map2, (map_preview_size, map_preview_size))
+                ]
+            else:
+                raise FileNotFoundError("Файлы превью не найдены")
+        except Exception as e:
+            print(f"Ошибка загрузки превью карт: {e}")
+            # Если изображения не найдены, создаем заглушки
+            self.map_images = [
+                pygame.Surface((map_preview_size, map_preview_size)),
+                pygame.Surface((map_preview_size, map_preview_size))
+            ]
+            self.map_images[0].fill((100, 100, 100))
+            self.map_images[1].fill((150, 150, 150))
+        
+        # Анимация рамки
+        self.border_animation_time = 0
+        self.border_animation_speed = 2  # Скорость анимации
+        
+    def draw(self, surface):
+        super().draw(surface)
+        
+        # Отрисовка кнопок сложности
+        for i, button in enumerate(self.difficulty_buttons):
+            if i == self.selected_difficulty:
+                button.color = (150, 0, 0)  # Выделяем выбранную сложность
+            else:
+                button.color = (80, 0, 0)
+            button.draw(surface)
+        
+        # Отрисовка превью карт
+        for i, rect in enumerate(self.map_previews):
+            # Рисуем превью
+            surface.blit(self.map_images[i], rect)
+            
+            # Анимация рамки для выбранной карты
+            if i == self.selected_map:
+                self.border_animation_time += self.border_animation_speed
+                border_color = (
+                    255,  # R
+                    int(128 + 127 * math.sin(self.border_animation_time * 0.1)),  # G
+                    int(128 + 127 * math.sin(self.border_animation_time * 0.1))   # B
+                )
+                pygame.draw.rect(surface, border_color, rect, 4)
+            else:
+                pygame.draw.rect(surface, (80, 80, 80), rect, 2)
+        
+        # Отрисовка кнопки "Играть"
+        self.play_button.draw(surface)
+        
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mouse_pos = pygame.mouse.get_pos()
+            
+            # Проверка нажатия на кнопки сложности
+            for i, button in enumerate(self.difficulty_buttons):
+                if button.rect.collidepoint(mouse_pos):
+                    self.selected_difficulty = i
+                    return None
+            
+            # Проверка нажатия на превью карт
+            for i, rect in enumerate(self.map_previews):
+                if rect.collidepoint(mouse_pos):
+                    self.selected_map = i
+                    return None
+            
+            # Проверка нажатия на кнопку "Играть"
+            if self.play_button.rect.collidepoint(mouse_pos):
+                return "play"
+        
+        # Обработка наведения мыши для кнопок
+        for button in self.difficulty_buttons:
+            button.handle_event(event)
+        self.play_button.handle_event(event)
+        
         return None
