@@ -426,7 +426,6 @@ class Game:
                 enemy.health = int(enemy.health * self.difficulty_multipliers[self.difficulty]['health'])
                 enemy.max_health = enemy.health
                 enemy.damage = int(enemy.damage * self.difficulty_multipliers[self.difficulty]['damage'])
-
 if __name__ == '__main__':
     game = Game()
     game.run()

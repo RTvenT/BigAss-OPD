@@ -45,10 +45,25 @@ class Enemy(pygame.sprite.Sprite):
         # HP bar
         self.hp_bar_width = 48  # Увеличиваем ширину
         self.hp_bar_height = 6  # Увеличиваем высоту
+        
+        # Опыт за убийство
+        self.experience_reward = self._get_experience_reward()
 
     def _determine_enemy_type(self, image):
         """Определяет тип врага по имени класса"""
         return self.__class__.__name__
+
+    def _get_experience_reward(self):
+        """Возвращает количество опыта за убийство в зависимости от типа врага"""
+        if self.enemy_type == 'Boss':
+            return 50
+        elif self.enemy_type == 'Bat':
+            return 5
+        elif self.enemy_type == 'Slime':
+            return 10
+        elif self.enemy_type == 'Skeleton':
+            return 10
+        return 5  # По умолчанию
 
     def update_mask(self):
         """Обновляем маску при каждом обновлении спрайта"""
@@ -288,6 +303,9 @@ class Enemy(pygame.sprite.Sprite):
                 self.death_image = death_surf
                 self.image = self.death_image
                 
+                # Добавляем опыт игроку
+                if hasattr(self.player, 'add_experience'):
+                    self.player.add_experience(self.experience_reward)
             except Exception as e:
                 print(f"Ошибка при создании эффекта смерти: {e}")
                 # Если что-то пошло не так, просто делаем спрайт белым

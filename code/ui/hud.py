@@ -18,10 +18,12 @@ class HUD:
         self.bg_color = (40, 40, 40)
         self.filled_color = (200, 0, 0)
         self.empty_color = (60, 60, 60)
+        self.exp_color = (0, 200, 0)  # Зеленый цвет для полоски опыта
 
         self.font = pygame.font.Font(None, 24)
         self.timer_font = pygame.font.Font(None, 36)  # Больший шрифт для таймера
         self.boss_font = pygame.font.Font(None, 48)  # Ещё больший шрифт для босса
+        self.level_font = pygame.font.Font(None, 32)  # Шрифт для уровня
 
         # Время начала игры
         self.start_time = pygame.time.get_ticks()
@@ -152,54 +154,83 @@ class HUD:
         surface.blit(timer_surface, (timer_x, timer_y))
 
     def draw(self, surface):
-        # Рисуем время выживания
-        self.draw_survival_time(surface)
+        if not self.player:
+            return
+
+        # Рисуем полоску здоровья
+        self.draw_health_bar(surface)
+        
+        # Рисуем полоску опыта
+        self.draw_experience_bar(surface)
+        
+        # Рисуем уровень
+        self.draw_level(surface)
+
+        # Рисуем время
+        self.draw_time(surface)
+
+        # Рисуем счетчик убийств
+        self.draw_kills(surface)
 
         # Рисуем время до босса
         self.draw_boss_timer(surface)
 
-        # Если нет игрока, рисуем только счетчик убийств
-        if not self.player:
-            # Счетчик убийств в правом верхнем углу
-            kills_text = f"Kills: {self.kills}"
-            kills_surface = self.font.render(kills_text, True, (255, 255, 0))  # Желтый цвет
-
-            kills_x = surface.get_width() - kills_surface.get_width() - 15
-            kills_y = 15
-
-            # Фон для счетчика убийств
-            kills_bg = pygame.Rect(kills_x - 10, kills_y - 5,
-                                   kills_surface.get_width() + 20,
-                                   kills_surface.get_height() + 10)
-            pygame.draw.rect(surface, (0, 0, 0, 128), kills_bg)
-            pygame.draw.rect(surface, (60, 60, 60), kills_bg, 2)
-
-            surface.blit(kills_surface, (kills_x, kills_y))
-            return
-
-        # Рисуем слоты оружия
+        # Рисуем инвентарь оружия
         self.draw_weapon_slots(surface)
 
-        # Считаем, сколько сегментов заполнено
-        hp_per_segment = 100 / self.segments_total
-        current_segments = max(0, int(self.player.health / hp_per_segment))
-
-        # Рисуем полоски здоровья
-        for i in range(self.segments_total):
-            rect = pygame.Rect(
-                self.x + i * (self.segment_width + self.gap),
-                self.y,
-                self.segment_width,
-                self.segment_height
-            )
-            pygame.draw.rect(surface, self.bg_color, rect.inflate(2, 2))  # рамка
-            color = self.filled_color if i < current_segments else self.empty_color
-            pygame.draw.rect(surface, color, rect)
-
+    def draw_health_bar(self, surface):
+        # Рисуем полоску здоровья
+        bar_width = 200
+        bar_height = 20
+        bar_x = self.x
+        bar_y = self.y
+        
+        # Фон полоски
+        pygame.draw.rect(surface, self.bg_color, (bar_x, bar_y, bar_width, bar_height))
+        
+        # Заполненная часть
+        health_percent = self.player.health / 1000  # Предполагаем, что максимальное здоровье 1000
+        filled_width = int(bar_width * health_percent)
+        pygame.draw.rect(surface, self.filled_color, (bar_x, bar_y, filled_width, bar_height))
+        
         # Текст здоровья
-        health_text = self.font.render(f'{int(self.player.health)}/100', True, (255, 255, 255))
-        surface.blit(health_text, (self.x, self.y + self.segment_height + 5))
+        health_text = f"HP: {self.player.health}/1000"
+        text_surf = self.font.render(health_text, True, (0, 0, 0))  # Черный цвет
+        surface.blit(text_surf, (bar_x + bar_width + 10, bar_y))
 
+    def draw_experience_bar(self, surface):
+        # Рисуем полоску опыта под полоской здоровья
+        bar_width = 200
+        bar_height = 10
+        bar_x = self.x
+        bar_y = self.y + 25  # Под полоской здоровья
+        
+        # Фон полоски
+        pygame.draw.rect(surface, self.bg_color, (bar_x, bar_y, bar_width, bar_height))
+        
+        # Заполненная часть
+        exp_percent = self.player.experience / self.player.experience_to_next_level
+        filled_width = int(bar_width * exp_percent)
+        pygame.draw.rect(surface, self.exp_color, (bar_x, bar_y, filled_width, bar_height))
+        
+        # Текст опыта
+        exp_text = f"XP: {self.player.experience}/{self.player.experience_to_next_level}"
+        text_surf = self.font.render(exp_text, True, (0, 0, 0))  # Черный цвет
+        surface.blit(text_surf, (bar_x + bar_width + 10, bar_y))
+
+    def draw_level(self, surface):
+        # Рисуем уровень в левом краю экрана под полоской опыта
+        level_text = f"LVL {self.player.level}"
+        text_surf = self.level_font.render(level_text, True, (0, 0, 0))  # Черный цвет
+        # Размещаем текст по левому краю экрана
+        text_x = 10  # Отступ от левого края
+        text_y = self.y + 40  # Под полоской опыта
+        surface.blit(text_surf, (text_x, text_y))
+
+    def draw_time(self, surface):
+        self.draw_survival_time(surface)
+
+    def draw_kills(self, surface):
         # Счетчик убийств в правом верхнем углу
         kills_text = f"Kills: {self.kills}"
         kills_surface = self.font.render(kills_text, True, (255, 255, 0))  # Желтый цвет

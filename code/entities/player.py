@@ -37,6 +37,11 @@ class Player(pygame.sprite.Sprite):
         self.alive = True
         self.death_time = 0
         
+        # Система уровней и опыта
+        self.level = 1
+        self.experience = 0
+        self.experience_to_next_level = 300  # Базовое количество опыта для 2 уровня
+        
         # weapon system
         self.bullet_sprites = pygame.sprite.Group()
         self.weapons = [
@@ -233,3 +238,26 @@ class Player(pygame.sprite.Sprite):
                     if self.current_weapon != 'drobovik':
                         bullet.kill()
                     break  # Прерываем проверку для этой пули, если попали во врага
+
+    def add_experience(self, amount):
+        """Добавляет опыт и проверяет повышение уровня"""
+        self.experience += amount
+        while self.experience >= self.experience_to_next_level:
+            self.level_up()
+    
+    def level_up(self):
+        """Повышает уровень персонажа"""
+        self.level += 1
+        self.experience -= self.experience_to_next_level
+        self.experience_to_next_level = int(self.experience_to_next_level * 3)  # Увеличиваем требуемый опыт в 3 раза
+        
+        # Увеличиваем характеристики при повышении уровня
+        self.health += 100  # Увеличиваем максимальное здоровье
+        self.speed += 20    # Увеличиваем скорость
+        
+        # Обновляем текущее здоровье до максимума
+        self.health = min(self.health, 2000)  # Ограничиваем максимальное здоровье
+        
+        # Обновляем урон оружия
+        for weapon in self.weapons:
+            weapon.damage = int(weapon.damage * 1.2)  # Увеличиваем урон на 20%
