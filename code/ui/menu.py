@@ -290,8 +290,9 @@ class GameParamsMenu(BaseMenu):
         self.map_images = []
         try:
             # Используем правильные пути к файлам
-            map1_path = join('images', 'maps', 'map1_preview.png')
-            map2_path = join('images', 'maps', 'map2_preview.png')
+            base_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            map2_path = os.path.join(base_path, 'images', 'maps', 'map1_preview.png')
+            map1_path = os.path.join(base_path, 'images', 'maps', 'map2_preview.png')
             
             if os.path.exists(map1_path) and os.path.exists(map2_path):
                 # Загружаем и масштабируем изображения
@@ -329,7 +330,7 @@ class GameParamsMenu(BaseMenu):
             else:
                 button.color = (80, 0, 0)
             button.draw(surface)
-        
+            
         # Отрисовка превью карт
         for i, rect in enumerate(self.map_previews):
             # Рисуем превью
@@ -359,7 +360,7 @@ class GameParamsMenu(BaseMenu):
                 if button.rect.collidepoint(mouse_pos):
                     self.selected_difficulty = i
                     return None
-            
+                
             # Проверка нажатия на превью карт
             for i, rect in enumerate(self.map_previews):
                 if rect.collidepoint(mouse_pos):
@@ -369,7 +370,7 @@ class GameParamsMenu(BaseMenu):
             # Проверка нажатия на кнопку "Играть"
             if self.play_button.rect.collidepoint(mouse_pos):
                 return "play"
-        
+                
         # Обработка наведения мыши для кнопок
         for button in self.difficulty_buttons:
             button.handle_event(event)
