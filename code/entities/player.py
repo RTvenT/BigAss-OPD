@@ -36,7 +36,8 @@ class Player(pygame.sprite.Sprite):
         self.enemy_sprites = enemy_sprites
         
         # stats
-        self.health = 1000
+        self.max_health = 1000  # Максимальное здоровье
+        self.health = self.max_health  # Текущее здоровье
         self.alive = True
         self.death_time = 0
         
@@ -298,16 +299,16 @@ class Player(pygame.sprite.Sprite):
         self.experience -= self.experience_to_next_level
         self.experience_to_next_level = int(self.experience_to_next_level * 3)  # Увеличиваем требуемый опыт в 3 раза
         
-        # Увеличиваем характеристики при повышении уровня
-        self.health += 100  # Увеличиваем максимальное здоровье
-        self.speed += 20    # Увеличиваем скорость
+        # Увеличиваем максимальное здоровье и восполняем его
+        self.max_health = min(self.max_health + 100, 2000)  # Увеличиваем максимальное здоровье на 100, но не более 2000
+        self.health = self.max_health  # Полностью восполняем здоровье
         
-        # Обновляем текущее здоровье до максимума
-        self.health = min(self.health, 2000)  # Ограничиваем максимальное здоровье
+        # Увеличиваем скорость на 2
+        self.speed += 2
         
-        # Обновляем урон оружия
+        # Обновляем урон оружия (увеличиваем на 5%)
         for weapon in self.weapons:
-            weapon.damage = int(weapon.damage * 1.2)  # Увеличиваем урон на 20%
+            weapon.damage = int(weapon.damage * 1.05)  # Увеличиваем урон на 5%
 
     def has_free_weapon_slot(self):
         return len(self.weapons) < 3

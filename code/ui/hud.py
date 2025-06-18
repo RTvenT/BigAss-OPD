@@ -189,12 +189,12 @@ class HUD:
         pygame.draw.rect(surface, self.bg_color, (bar_x, bar_y, bar_width, bar_height))
         
         # Заполненная часть
-        health_percent = self.player.health / 1000  # Предполагаем, что максимальное здоровье 1000
+        health_percent = self.player.health / self.player.max_health
         filled_width = int(bar_width * health_percent)
         pygame.draw.rect(surface, self.filled_color, (bar_x, bar_y, filled_width, bar_height))
         
         # Текст здоровья
-        health_text = f"HP: {self.player.health}/1000"
+        health_text = f"HP: {self.player.health}/{self.player.max_health}"
         text_surf = self.font.render(health_text, True, (0, 0, 0))  # Черный цвет
         surface.blit(text_surf, (bar_x + bar_width + 10, bar_y))
 

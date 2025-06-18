@@ -201,7 +201,7 @@ class Enemy(pygame.sprite.Sprite):
                         if current_time - self.hit_effect_time < self.hit_effect_duration:
                             # Создаем текст с уроном
                             font = pygame.font.Font(None, 24)
-                            damage_text = font.render(f"-{self.hit_damage}", True, (255, 255, 255))
+                            damage_text = font.render(f"-{self.hit_damage}", True, (220, 20, 60))
                             
                             # Позиция текста над полоской здоровья
                             text_pos = (bar_rect.centerx - damage_text.get_width() // 2,
