@@ -2,6 +2,7 @@ import pygame
 import math
 from os.path import join
 from .enemy import Enemy
+from weapons import Sword, WeaponItem
 
 from core import WINDOW_WIDTH, WINDOW_HEIGHT
 
@@ -46,6 +47,9 @@ class Boss(Enemy):
         self.health = int(self.health * difficulty_multipliers[difficulty]['health'])
         self.max_health = self.health
         self.damage = int(self.damage * difficulty_multipliers[difficulty]['damage'])
+        
+        # Босс не дропает обычное оружие
+        self.weapon_drop_chance = 0
 
     def draw_hp_bar(self, surface, offset):
         if self.death_time == 0:  # Рисуем полоску здоровья только для живых врагов
@@ -173,3 +177,22 @@ class Boss(Enemy):
                 if hasattr(self.player, 'hud'):
                     self.player.hud.add_kill()
                 self.destroy()
+
+    def death_timer(self):
+        """Обработка смерти босса"""
+        if self.death_time > 0:
+            current_time = pygame.time.get_ticks()
+            if current_time - self.death_time >= self.death_duration:
+                # Проверяем, нет ли уже меча у игрока
+                has_sword = any(isinstance(weapon, Sword) for weapon in self.player.weapons)
+                
+                if not has_sword:
+                    print(f"[DEBUG] Boss death - Dropping Sword at position {self.rect.center}")
+                    # Создаем меч на месте смерти босса
+                    temp_sword = Sword(None, {'all': self.all_sprites, 'bullet': pygame.sprite.Group()})
+                    WeaponItem(temp_sword, self.rect.center, self.all_sprites)
+                else:
+                    print(f"[DEBUG] Boss death - Player already has a Sword, not dropping")
+                
+                # Удаляем босса
+                self.kill()

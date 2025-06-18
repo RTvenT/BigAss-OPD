@@ -1,13 +1,18 @@
 import pygame
 import math
 import random
+from random import random, choice
 
 from core import WINDOW_WIDTH, WINDOW_HEIGHT
+from weapons import AutoRifle, Pistol, Shotgun, WeaponItem
 
 
 class Enemy(pygame.sprite.Sprite):
     def __init__(self, pos, frames, groups, player, collision_sprites):
         super().__init__(groups)
+        
+        # Сохраняем ссылку на группу all_sprites
+        self.all_sprites = groups[0] if isinstance(groups, (list, tuple)) else groups
         
         # animation
         self.frames = frames
@@ -26,7 +31,7 @@ class Enemy(pygame.sprite.Sprite):
         self.direction = pygame.math.Vector2()
         
         # collisions - одинаковый хитбокс для всех врагов
-        self.hitbox_rect = self.rect.inflate(-self.rect.width * 0.5, -self.rect.height * 0.5)
+        self.hitbox_rect = self.rect.inflate(-self.rect.width * 0.6, -self.rect.height * 0.6)
         self.collision_sprites = collision_sprites
         
         # player interaction
@@ -48,6 +53,10 @@ class Enemy(pygame.sprite.Sprite):
         
         # Опыт за убийство
         self.experience_reward = self._get_experience_reward()
+        
+        # Шансы дропа оружия
+        self.weapon_drop_chance = 0.3  # Увеличиваем до 30%
+        self.possible_weapons = [AutoRifle, Shotgun]  # Убираем пистолет из списка дропа
 
     def _determine_enemy_type(self, image):
         """Определяет тип врага по имени класса"""
@@ -315,10 +324,45 @@ class Enemy(pygame.sprite.Sprite):
                 self.image = self.death_image
 
     def death_timer(self):
-        """Обработка анимации смерти"""
+        """Обработка смерти врага"""
         if self.death_time > 0:
             current_time = pygame.time.get_ticks()
             if current_time - self.death_time >= self.death_duration:
+                # Проверяем шанс дропа оружия перед удалением врага
+                roll = random()
+                print(f"[DEBUG] Enemy death - Weapon drop roll: {roll:.2f} (need < {self.weapon_drop_chance})")
+                if roll < self.weapon_drop_chance:
+                    # Фильтруем список возможного оружия, исключая те, что уже есть у игрока
+                    available_weapons = []
+                    for weapon_class in self.possible_weapons:
+                        # Проверяем есть ли оружие такого типа у игрока
+                        weapon_exists = False
+                        for player_weapon in self.player.weapons:
+                            if isinstance(player_weapon, weapon_class):
+                                weapon_exists = True
+                                break
+                        if not weapon_exists:
+                            available_weapons.append(weapon_class)
+                    
+                    # Если есть доступное оружие, выбираем случайное из них
+                    if available_weapons:
+                        weapon_class = choice(available_weapons)
+                        print(f"[DEBUG] Dropping weapon: {weapon_class.__name__} at position {self.rect.center}")
+                        print(f"[DEBUG] Using all_sprites group: {self.all_sprites}")
+                        
+                        # Создаем оружие с временным игроком
+                        class TempPlayer:
+                            def __init__(self):
+                                self.rect = pygame.Rect(0, 0, 32, 32)
+                        
+                        weapon = weapon_class(TempPlayer(), {'all': self.all_sprites, 'bullet': pygame.sprite.Group()})
+                        print(f"[DEBUG] Created weapon: {weapon.__class__.__name__}")
+                        
+                        # Создаем WeaponItem на месте смерти врага
+                        weapon_item = WeaponItem(weapon, self.rect.center, self.all_sprites)
+                        print(f"[DEBUG] Created WeaponItem: {weapon_item} in group {weapon_item.groups}")
+                
+                # Удаляем врага
                 self.kill()
             else:
                 # Вычисляем прогресс анимации смерти

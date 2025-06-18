@@ -57,6 +57,10 @@ class Player(pygame.sprite.Sprite):
         for weapon in self.weapons:
             weapon.all_sprites = groups  # Передаем сам объект groups
         self.gun = GunSprite(self, groups)
+        
+        # Добавляем задержку для выбрасывания оружия
+        self.last_drop_time = 0
+        self.drop_cooldown = 500  # 500 миллисекунд между выбрасываниями
 
     def import_assets(self):
         """Импорт всех анимаций игрока"""
@@ -159,9 +163,11 @@ class Player(pygame.sprite.Sprite):
         elif keys[pygame.K_3]:
             self.switch_weapon(2)
 
-        # Drop weapon
-        if keys[pygame.K_q]:
+        # Drop weapon with cooldown
+        current_time = pygame.time.get_ticks()
+        if keys[pygame.K_q] and current_time - self.last_drop_time >= self.drop_cooldown:
             self.drop_weapon()
+            self.last_drop_time = current_time
 
         # Shooting
         if pygame.mouse.get_pressed()[0] and self.current_weapon is not None:
@@ -199,11 +205,10 @@ class Player(pygame.sprite.Sprite):
                 self.rect.centery + direction.y * throw_distance
             )
             
-            # Создаем WeaponItem
-            WeaponItem(self.current_weapon, throw_pos, self.all_sprites)
-            
-            # Удаляем оружие из инвентаря
-            self.weapons.pop(self.current_weapon_index)
+            # Создаем WeaponItem из текущего оружия
+            weapon_to_drop = self.current_weapon
+            self.weapons.remove(weapon_to_drop)  # Удаляем текущее оружие из списка
+            WeaponItem(weapon_to_drop, throw_pos, self.all_sprites)
             
             # Обновляем текущее оружие
             if self.weapons:
@@ -215,7 +220,7 @@ class Player(pygame.sprite.Sprite):
                 self.current_weapon = None
                 self.current_weapon_index = 0
                 if self.gun:
-                    self.gun.kill()  # Удаляем спрайт оружия вместо установки image = None
+                    self.gun.kill()  # Удаляем спрайт оружия
 
     def check_death(self):
         if self.health <= 0 and self.alive:
@@ -318,24 +323,30 @@ class Player(pygame.sprite.Sprite):
     def pickup_weapon(self, weapon_type):
         """Подбирает оружие в первый свободный слот"""
         if not self.can_pickup_weapon():
+            print(f"[DEBUG] Cannot pickup weapon: inventory full")
             return False
             
+        print(f"[DEBUG] Creating new weapon of type {weapon_type.__class__.__name__}")
         # Создаем новое оружие
         new_weapon = weapon_type.__class__(self, {'all': self.all_sprites, 'bullet': self.bullet_sprites})
         
         # Добавляем в первый свободный слот
         self.weapons.append(new_weapon)
+        print(f"[DEBUG] Added weapon to inventory. Total weapons: {len(self.weapons)}")
         
         # Если это первое оружие, делаем его текущим
         if len(self.weapons) == 1:
             self.current_weapon_index = 0
             self.current_weapon = self.weapons[self.current_weapon_index]
+            print(f"[DEBUG] Set as current weapon (first weapon)")
             
         # Создаем или обновляем спрайт оружия в руках
         if not self.gun or not self.gun.alive():
             from weapons import GunSprite
+            print(f"[DEBUG] Creating new GunSprite")
             self.gun = GunSprite(self, self.all_sprites)
         else:
+            print(f"[DEBUG] Updating existing GunSprite")
             self.gun.image = self.current_weapon.weapon_surf
         
         return True

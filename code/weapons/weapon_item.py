@@ -5,11 +5,12 @@ class WeaponItem(pygame.sprite.Sprite):
     def __init__(self, weapon_type, pos, groups):
         super().__init__(groups)
         self.weapon_type = weapon_type
-        self.groups = groups
+        self.groups = groups if isinstance(groups, (list, tuple)) else [groups]
         
         # Спрайт оружия
         self.image = weapon_type.weapon_surf.copy()
         self.rect = self.image.get_rect(center=pos)
+        print(f"[DEBUG] WeaponItem initialized with weapon type {weapon_type.__class__.__name__} at {pos}")
         
         # Эффект парения
         self.float_offset = 0
@@ -34,8 +35,18 @@ class WeaponItem(pygame.sprite.Sprite):
         self.throw_cooldown = 500  # Время в миллисекундах, в течение которого нельзя подобрать оружие
         self.throw_time = pygame.time.get_ticks()
         
+        # Время жизни оружия на земле
+        self.lifetime = 20000  # 20 секунд в миллисекундах
+        self.spawn_time = pygame.time.get_ticks()
+        
     def update(self, dt):
         current_time = pygame.time.get_ticks()
+        
+        # Проверяем время жизни
+        if current_time - self.spawn_time >= self.lifetime:
+            print(f"[DEBUG] WeaponItem {self.weapon_type.__class__.__name__} disappeared after {self.lifetime/1000} seconds")
+            self.kill()
+            return
         
         # Обновляем эффект парения
         self.time += dt * self.float_speed
@@ -47,15 +58,21 @@ class WeaponItem(pygame.sprite.Sprite):
         self.image = pygame.transform.rotate(self.weapon_type.weapon_surf, angle)
         self.rect = self.image.get_rect(center=self.rect.center)
         
-        # Проверяем подбор оружия только после окончания кулдауна броска
-        if current_time - self.throw_time >= self.throw_cooldown:
-            for group in self.groups:
-                for sprite in group:
+        # Проверяем подбор оружия
+        for group in self.groups:
+            if hasattr(group, 'sprites'):  # Проверяем, что это группа спрайтов
+                for sprite in group.sprites():  # Используем метод sprites() для получения списка спрайтов
                     if hasattr(sprite, 'weapons'):  # Ищем игрока
                         distance = pygame.math.Vector2(sprite.rect.center).distance_to(pygame.math.Vector2(self.rect.center))
+                        print(f"[DEBUG] Distance to player: {distance} (need < {self.pickup_radius})")
                         if distance < self.pickup_radius and sprite.can_pickup_weapon():
+                            print(f"[DEBUG] Attempting to pickup weapon {self.weapon_type.__class__.__name__}")
+                            # Передаем само оружие, а не его тип
                             if sprite.pickup_weapon(self.weapon_type):
+                                print(f"[DEBUG] Weapon pickup successful")
                                 self.kill()  # Удаляем предмет с карты
+                            else:
+                                print(f"[DEBUG] Weapon pickup failed")
                             break
     
     def draw_effects(self, surface, offset):
@@ -72,10 +89,10 @@ class WeaponItem(pygame.sprite.Sprite):
         )
         surface.blit(self.glow_surface, glow_pos)
         
-        # Проверяем расстояние до игрока и показываем зеленую подсветку только после кулдауна
-        if current_time - self.throw_time >= self.throw_cooldown:
-            for group in self.groups:
-                for sprite in group:
+        # Проверяем расстояние до игрока
+        for group in self.groups:
+            if hasattr(group, 'sprites'):  # Проверяем, что это группа спрайтов
+                for sprite in group.sprites():  # Используем метод sprites() для получения списка спрайтов
                     if hasattr(sprite, 'weapons'):  # Ищем игрока
                         distance = pygame.math.Vector2(sprite.rect.center).distance_to(pygame.math.Vector2(self.rect.center))
                         if distance < self.pickup_radius and sprite.can_pickup_weapon():
