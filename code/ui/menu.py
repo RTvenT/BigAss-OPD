@@ -2,7 +2,7 @@ import pygame
 import math
 import os
 from os.path import join
-from core import *
+from core import WINDOW_WIDTH, WINDOW_HEIGHT, load_settings, save_settings
 
 
 class Button:
@@ -102,16 +102,28 @@ class BaseMenu:
         self.title = ""
         self.background_color = (30, 0, 0)  # Тёмно-бордовый фон
         
+        # Загружаем фоновое изображение для меню
+        try:
+            self.background_image = pygame.image.load(join('..', 'images', 'ui', 'menu_bg.jpg')).convert()
+            # Масштабируем изображение под размер окна
+            self.background_image = pygame.transform.scale(self.background_image, (WINDOW_WIDTH, WINDOW_HEIGHT))
+        except:
+            self.background_image = None
+        
     def draw(self, surface):
-        # Градиентный фон
-        for i in range(WINDOW_HEIGHT):
-            darkness = 1 - (i / WINDOW_HEIGHT * 0.5)  # Затемнение сверху вниз
-            color = (int(30 * darkness), 0, 0)
-            pygame.draw.line(surface, color, (0, i), (WINDOW_WIDTH, i))
+        # Отрисовка фона
+        if self.background_image:
+            surface.blit(self.background_image, (0, 0))
+        else:
+            # Градиентный фон как запасной вариант
+            for i in range(WINDOW_HEIGHT):
+                darkness = 1 - (i / WINDOW_HEIGHT * 0.5)
+                color = (int(30 * darkness), 0, 0)
+                pygame.draw.line(surface, color, (0, i), (WINDOW_WIDTH, i))
             
         if self.title:
-            # Тень для заголовка
-            title_shadow = self.font.render(self.title, True, (20, 0, 0))
+            # Тень для заголовка (белая)
+            title_shadow = self.font.render(self.title, True, (255, 255, 255))
             shadow_rect = title_shadow.get_rect(centerx=WINDOW_WIDTH // 2 + 2, y=52)
             surface.blit(title_shadow, shadow_rect)
             
@@ -132,7 +144,7 @@ class BaseMenu:
 class MainMenu(BaseMenu):
     def __init__(self):
         super().__init__()
-        self.title = "Vampire Survivor"
+        self.title = "Большие S"
         center_x = WINDOW_WIDTH // 2 - 100
         self.buttons = [
             Button(center_x, 200, 200, 50, "Играть"),
@@ -316,9 +328,7 @@ class GameParamsMenu(BaseMenu):
             self.map_images[0].fill((100, 100, 100))
             self.map_images[1].fill((150, 150, 150))
         
-        # Анимация рамки
-        self.border_animation_time = 0
-        self.border_animation_speed = 2  # Скорость анимации
+        # Инициализация завершена
         
     def draw(self, surface):
         super().draw(surface)
@@ -336,16 +346,12 @@ class GameParamsMenu(BaseMenu):
             # Рисуем превью
             surface.blit(self.map_images[i], rect)
             
-            # Анимация рамки для выбранной карты
+            # Рамка для карт
             if i == self.selected_map:
-                self.border_animation_time += self.border_animation_speed
-                border_color = (
-                    255,  # R
-                    int(128 + 127 * math.sin(self.border_animation_time * 0.1)),  # G
-                    int(128 + 127 * math.sin(self.border_animation_time * 0.1))   # B
-                )
-                pygame.draw.rect(surface, border_color, rect, 4)
+                # Белая рамка для выбранной карты
+                pygame.draw.rect(surface, (255, 255, 255), rect, 4)
             else:
+                # Серая рамка для невыбранной карты
                 pygame.draw.rect(surface, (80, 80, 80), rect, 2)
         
         # Отрисовка кнопки "Играть"

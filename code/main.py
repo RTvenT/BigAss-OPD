@@ -28,7 +28,7 @@ class Game:
         # setup
         pygame.init()
         self.display_surface = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-        pygame.display.set_caption('Survivor')
+        pygame.display.set_caption('Большие S')
         self.clock = pygame.time.Clock()
         self.running = True
 
@@ -90,7 +90,7 @@ class Game:
         self.initial_boss_delay = True  # Флаг для первого спавна
 
         # audio 
-        self.music = pygame.mixer.Sound(join('..', 'audio', 'music1.wav'))
+        self.music = pygame.mixer.Sound(join('..', 'audio', 'music.wav'))
         self.music.set_volume(self.music_volume)
         self.music.play(loops = -1)
         self.impact_sound = pygame.mixer.Sound(join('..', 'audio', 'impact.ogg'))
@@ -173,11 +173,16 @@ class Game:
         for obj in tmx_data.get_layer_by_name('Collisions'):
             CollisionSprite((obj.x, obj.y), pygame.Surface((obj.width, obj.height)), self.collision_sprites)
             
-        # Создаем игрока
+        # Создаем списки для точек спавна
+        self.spawn_positions = []
+        self.boss_spawn_positions = []
+        
+        # Создаем игрока и обрабатываем точки спавна
         for obj in tmx_data.get_layer_by_name('Entities'):
+            pos = (obj.x, obj.y)
             if obj.name == 'Player':
                 self.player = Player(
-                    (obj.x, obj.y),
+                    pos,
                     [self.all_sprites],
                     self.collision_sprites,
                     self.enemy_sprites,
@@ -185,9 +190,15 @@ class Game:
                 )
                 # Присваиваем HUD игроку
                 self.player.hud = self.hud
-            else:
-                pos = (obj.x, obj.y)
-                # Проверка расстояния
+            elif obj.name == 'Boss':
+                # Проверяем расстояние для точки спавна босса
+                if self.player:
+                    player_pos = pygame.math.Vector2(self.player.rect.center)
+                    spawn_pos = pygame.math.Vector2(pos)
+                    if player_pos.distance_to(spawn_pos) > 200:  # Увеличенная дистанция для босса
+                        self.boss_spawn_positions.append(pos)
+            elif obj.name == 'Enemy':
+                # Проверка расстояния для обычных врагов
                 if self.player:
                     player_pos = pygame.math.Vector2(self.player.rect.center)
                     spawn_pos = pygame.math.Vector2(pos)
@@ -278,8 +289,8 @@ class Game:
                          self.settings_menu.sound_slider.value)
 
     def spawn_boss(self):
-        """Спавн босса недалеко от игрока"""
-        if not self.player:
+        """Спавн босса в одной из предназначенных точек спавна"""
+        if not self.player or not self.boss_spawn_positions:
             return
 
         self.boss_spawn_timer += self.clock.get_time()  # Добавляем прошедшее время
@@ -295,19 +306,21 @@ class Game:
 
         self.initial_boss_delay = False  # Сбрасываем флаг после первой задержки
 
+        # Проверяем, прошло ли достаточно времени с последнего спавна
         if self.boss_spawn_timer >= self.boss_spawn_interval:
-            # print("Спавним босса!")  # Отладочное сообщение
+            # Выбираем случайную точку спавна для босса
+            spawn_pos = choice(self.boss_spawn_positions)
             
-            # Спавним босса на расстоянии 200 пикселей от игрока в случайном направлении
-            angle = random.randint(0, 360)  # Случайный угол
-            spawn_distance = 200  # Расстояние от игрока
+            # Создаем босса
+            Boss(
+                spawn_pos,
+                [self.all_sprites, self.enemy_sprites],
+                self.player,
+                self.collision_sprites
+            )
             
-            # Вычисляем позицию спавна
-            spawn_offset = pygame.Vector2(spawn_distance, 0).rotate(angle)
-            spawn_pos = pygame.Vector2(self.player.rect.center) + spawn_offset
-            
-            Boss(spawn_pos, [self.all_sprites, self.enemy_sprites], self.player, self.collision_sprites)
-            self.boss_spawn_timer = 0  # Сбрасываем таймер
+            # Сбрасываем таймер
+            self.boss_spawn_timer = 0
 
     def run(self):
         while self.running:
