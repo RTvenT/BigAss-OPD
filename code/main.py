@@ -1,4 +1,4 @@
-import pygame.mouse
+import pygame
 import os
 import sys
 from os.path import join
@@ -15,7 +15,7 @@ from core import (
     load_settings, save_settings, GameState
 )
 from sprites import Sprite, CollisionSprite, AllSprites
-from weapons import Sword
+from weapons import Sword, WeaponItem
 from pytmx.util_pygame import load_pygame
 from entities import Player, Boss, Bat, Slime, Skeleton
 from ui import HUD, MainMenu, PauseMenu, GameOverMenu, SettingsMenu, GameParamsMenu
@@ -375,6 +375,15 @@ class Game:
                     for enemy in self.enemy_sprites:
                     #     enemy.draw_hitbox(self.display_surface, self.all_sprites.offset)
                         enemy.draw_hp_bar(self.display_surface, self.all_sprites.offset)
+                    
+                    # Отрисовка эффектов оружия
+                    for sprite in self.all_sprites:
+                        if isinstance(sprite, WeaponItem):
+                            sprite.draw_effects(self.display_surface, self.all_sprites.offset)
+                    
+                    # Отрисовка области атаки меча (после всего остального)
+                    if self.player and isinstance(self.player.current_weapon, Sword):
+                        self.player.current_weapon.draw_attack_area(self.display_surface)
                 
                 # Отрисовка HUD только во время игры
                 if self.player and self.hud:
@@ -384,10 +393,6 @@ class Game:
                 if not pygame.mouse.get_visible():
                     crosshair_rect = self.crosshair_image.get_rect(center = pygame.mouse.get_pos())
                     self.display_surface.blit(self.crosshair_image, crosshair_rect)
-                
-                # Отрисовка области атаки меча (после всего остального)
-                if self.player and isinstance(self.player.current_weapon, Sword):
-                    self.player.current_weapon.draw_attack_area(self.display_surface)
 
             pygame.display.update()
         
@@ -424,6 +429,7 @@ class Game:
                 enemy.health = int(enemy.health * self.difficulty_multipliers[self.difficulty]['health'])
                 enemy.max_health = enemy.health
                 enemy.damage = int(enemy.damage * self.difficulty_multipliers[self.difficulty]['damage'])
+
 if __name__ == '__main__':
     game = Game()
     game.run()

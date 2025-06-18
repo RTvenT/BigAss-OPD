@@ -1,7 +1,7 @@
 import pygame
 import os
 
-from weapons import Pistol, Shotgun, Sword, AutoRifle, GunSprite, Bullet
+from weapons import Pistol, Shotgun, Sword, AutoRifle, GunSprite, Bullet, WeaponItem
 from core import WINDOW_WIDTH, WINDOW_HEIGHT
 
 
@@ -11,6 +11,9 @@ class Player(pygame.sprite.Sprite):
         
         # Сохраняем ссылку на игру
         self.game = game
+        
+        # Сохраняем ссылку на группу всех спрайтов
+        self.all_sprites = groups
         
         # animation setup
         self.import_assets()
@@ -45,10 +48,9 @@ class Player(pygame.sprite.Sprite):
         # weapon system
         self.bullet_sprites = pygame.sprite.Group()
         self.weapons = [
-            Pistol(self, {'all': groups, 'bullet': self.bullet_sprites}),
-            Sword(self, {'all': groups, 'bullet': self.bullet_sprites}),
-            AutoRifle(self, {'all': groups, 'bullet': self.bullet_sprites})
+            Pistol(self, {'all': groups, 'bullet': self.bullet_sprites})
         ]
+        self.max_weapons = 3  # Максимальное количество оружия
         self.current_weapon_index = 0
         self.current_weapon = self.weapons[self.current_weapon_index]
         # Сохраняем ссылку на all_sprites в оружии
@@ -130,11 +132,13 @@ class Player(pygame.sprite.Sprite):
         self.animate(dt)
         self.bullet_sprites.update(dt)
         self.check_death()
+        self.check_weapon_pickup()  # Добавляем проверку подбора оружия
         
         if self.alive:
             weapon_dir = self.get_weapon_direction()
-            self.current_weapon.update_position(pygame.math.Vector2(self.rect.center), weapon_dir)
-            self.current_weapon.update_timer(self.current_weapon.cooldown)
+            if self.current_weapon is not None:
+                self.current_weapon.update_position(pygame.math.Vector2(self.rect.center), weapon_dir)
+                self.current_weapon.update_timer(self.current_weapon.cooldown)
 
     def input(self):
         if not self.alive:
@@ -155,8 +159,12 @@ class Player(pygame.sprite.Sprite):
         elif keys[pygame.K_3]:
             self.switch_weapon(2)
 
+        # Drop weapon
+        if keys[pygame.K_q]:
+            self.drop_weapon()
+
         # Shooting
-        if pygame.mouse.get_pressed()[0]:
+        if pygame.mouse.get_pressed()[0] and self.current_weapon is not None:
             self.current_weapon.shoot()
 
     def get_weapon_direction(self):
@@ -174,6 +182,40 @@ class Player(pygame.sprite.Sprite):
             self.current_weapon = self.weapons[self.current_weapon_index]
             # Обновляем изображение оружия
             self.gun.image = self.current_weapon.weapon_surf
+
+    def drop_weapon(self):
+        """Выбрасывает текущее оружие"""
+        if not self.weapons or not self.current_weapon:
+            return
+            
+        # Получаем направление из GunSprite
+        if self.gun:
+            direction = self.gun.player_direction
+            throw_distance = 100  # Расстояние выброса
+            
+            # Вычисляем позицию выброса
+            throw_pos = (
+                self.rect.centerx + direction.x * throw_distance,
+                self.rect.centery + direction.y * throw_distance
+            )
+            
+            # Создаем WeaponItem
+            WeaponItem(self.current_weapon, throw_pos, self.all_sprites)
+            
+            # Удаляем оружие из инвентаря
+            self.weapons.pop(self.current_weapon_index)
+            
+            # Обновляем текущее оружие
+            if self.weapons:
+                self.current_weapon_index = min(self.current_weapon_index, len(self.weapons) - 1)
+                self.current_weapon = self.weapons[self.current_weapon_index]
+                if self.gun:
+                    self.gun.image = self.current_weapon.weapon_surf
+            else:
+                self.current_weapon = None
+                self.current_weapon_index = 0
+                if self.gun:
+                    self.gun.kill()  # Удаляем спрайт оружия вместо установки image = None
 
     def check_death(self):
         if self.health <= 0 and self.alive:
@@ -261,3 +303,49 @@ class Player(pygame.sprite.Sprite):
         # Обновляем урон оружия
         for weapon in self.weapons:
             weapon.damage = int(weapon.damage * 1.2)  # Увеличиваем урон на 20%
+
+    def has_free_weapon_slot(self):
+        return len(self.weapons) < 3
+
+    def find_free_weapon_slot(self):
+        """Находит первый свободный слот для оружия"""
+        return len(self.weapons) if len(self.weapons) < self.max_weapons else -1
+
+    def can_pickup_weapon(self):
+        """Проверяет, может ли игрок подобрать оружие"""
+        return len(self.weapons) < self.max_weapons
+
+    def pickup_weapon(self, weapon_type):
+        """Подбирает оружие в первый свободный слот"""
+        if not self.can_pickup_weapon():
+            return False
+            
+        # Создаем новое оружие
+        new_weapon = weapon_type.__class__(self, {'all': self.all_sprites, 'bullet': self.bullet_sprites})
+        
+        # Добавляем в первый свободный слот
+        self.weapons.append(new_weapon)
+        
+        # Если это первое оружие, делаем его текущим
+        if len(self.weapons) == 1:
+            self.current_weapon_index = 0
+            self.current_weapon = self.weapons[self.current_weapon_index]
+            
+        # Создаем или обновляем спрайт оружия в руках
+        if not self.gun or not self.gun.alive():
+            from weapons import GunSprite
+            self.gun = GunSprite(self, self.all_sprites)
+        else:
+            self.gun.image = self.current_weapon.weapon_surf
+        
+        return True
+
+    def check_weapon_pickup(self):
+        # Проверяем все спрайты на карте
+        for sprite in self.all_sprites:
+            if isinstance(sprite, WeaponItem):
+                # Проверяем расстояние до оружия
+                distance = pygame.math.Vector2(sprite.rect.center).distance_to(pygame.math.Vector2(self.rect.center))
+                if distance < 50:  # Радиус подбора
+                    self.pickup_weapon(sprite)
+                    break

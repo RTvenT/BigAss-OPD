@@ -84,7 +84,7 @@ class HUD:
 
         # Фон для всех слотов
         slots_bg_width = (self.weapon_slot_size * 3) + (self.weapon_slot_gap * 2) + 10
-        slots_bg_height = self.weapon_slot_size + 10  # Уменьшили высоту, убрав место для текста
+        slots_bg_height = self.weapon_slot_size + 10
         slots_bg_rect = pygame.Rect(
             center_x - slots_bg_width // 2,
             self.weapon_slots_y - 5,
