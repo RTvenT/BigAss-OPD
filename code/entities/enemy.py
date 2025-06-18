@@ -123,7 +123,7 @@ class Enemy(pygame.sprite.Sprite):
             if current_time - self.last_attack >= self.attack_cooldown:
                 self.player.health -= self.damage
                 self.last_attack = current_time
-                print(f"Враг атакует! Здоровье игрока: {self.player.health}")  # для отладки
+                # print(f"Враг атакует! Здоровье игрока: {self.player.health}")  # для отладки
 
     def collision(self, direction):
         # Коллизия с окружением
@@ -219,15 +219,16 @@ class Enemy(pygame.sprite.Sprite):
                                     pygame.draw.line(surface, (255, 50, 50, alpha), 
                                                    start_pos, end_pos, 3)  # Увеличили толщину и сделали красный цвет ярче
                     
-                    print(f"Drawing HP bar at {bar_rect.topleft}, health={self.health}/{self.max_health}, width={health_width}")
+                    # print(f"Drawing HP bar at {bar_rect.topleft}, health={self.health}/{self.max_health}, width={health_width}")
             except Exception as e:
-                print(f"Error drawing HP bar: {e}")
+                # print(f"Error drawing HP bar: {e}")
+                pass
 
     def take_damage(self, amount):
         """Получение урона"""
         if self.death_time == 0:  # Проверяем, что враг еще жив
             self.health -= amount
-            print(f"Враг получил {amount} урона. Осталось здоровья: {self.health}")  # Для отладки
+            # print(f"Враг получил {amount} урона. Осталось здоровья: {self.health}")  # Для отладки
             
             # Создаем эффект попадания
             self.hit_effect_time = pygame.time.get_ticks()
@@ -240,7 +241,7 @@ class Enemy(pygame.sprite.Sprite):
             
             # Создаем маску из текущего изображения
             mask = pygame.mask.from_surface(self.image)
-            bright_overlay = pygame.Surface(self.image.get_size(), pygame.SRCALPHA)
+            dark_overlay = pygame.Surface(self.image.get_size(), pygame.SRCALPHA)
             
             # Заполняем только те пиксели, где есть спрайт
             for x in range(self.image.get_width()):
@@ -248,14 +249,14 @@ class Enemy(pygame.sprite.Sprite):
                     if mask.get_at((x, y)):
                         # Получаем текущий цвет пикселя
                         current_color = self.image.get_at((x, y))
-                        # Увеличиваем яркость
-                        r = min(255, current_color[0] + 100)
-                        g = min(255, current_color[1] + 100)
-                        b = min(255, current_color[2] + 100)
-                        bright_overlay.set_at((x, y), (r, g, b, current_color[3]))
+                        # Уменьшаем яркость
+                        r = max(0, current_color[0] - 100)
+                        g = max(0, current_color[1] - 100)
+                        b = max(0, current_color[2] - 100)
+                        dark_overlay.set_at((x, y), (r, g, b, current_color[3]))
             
-            # Накладываем яркую маску
-            self.image.blit(bright_overlay, (0, 0))
+            # Накладываем темную маску
+            self.image.blit(dark_overlay, (0, 0))
             
             # Создаем красные палочки
             self.hit_lines = []
@@ -292,11 +293,11 @@ class Enemy(pygame.sprite.Sprite):
                 # Получаем контур маски
                 outline = mask.outline()
                 if outline:
-                    # Заполняем внутреннюю часть белым цветом
-                    pygame.draw.polygon(death_surf, (255, 255, 255, 180), outline)
+                    # Заполняем внутреннюю часть черным цветом
+                    pygame.draw.polygon(death_surf, (0, 0, 0, 180), outline)
                     
-                # Создаем точную копию спрайта в белом цвете
-                sprite_surf = mask.to_surface(setcolor=(255, 255, 255, 180), unsetcolor=(0, 0, 0, 0))
+                # Создаем точную копию спрайта в черном цвете
+                sprite_surf = mask.to_surface(setcolor=(0, 0, 0, 180), unsetcolor=(0, 0, 0, 0))
                 death_surf.blit(sprite_surf, (0, 0))
                 
                 # Сохраняем изображение для анимации
@@ -307,10 +308,10 @@ class Enemy(pygame.sprite.Sprite):
                 if hasattr(self.player, 'add_experience'):
                     self.player.add_experience(self.experience_reward)
             except Exception as e:
-                print(f"Ошибка при создании эффекта смерти: {e}")
-                # Если что-то пошло не так, просто делаем спрайт белым
+                # print(f"Ошибка при создании эффекта смерти: {e}")
+                # Если что-то пошло не так, просто делаем спрайт черным
                 self.death_image = self.image.copy()
-                self.death_image.fill((255, 255, 255, 180))
+                self.death_image.fill((0, 0, 0, 180))
                 self.image = self.death_image
 
     def death_timer(self):
@@ -328,7 +329,7 @@ class Enemy(pygame.sprite.Sprite):
                 
                 # Создаем новое изображение с текущей прозрачностью
                 new_image = self.death_image.copy()
-                new_image.fill((255, 255, 255, alpha), special_flags=pygame.BLEND_RGBA_MULT)
+                new_image.fill((0, 0, 0, alpha), special_flags=pygame.BLEND_RGBA_MULT)
                 self.image = new_image
 
     def update(self, dt):
@@ -353,7 +354,7 @@ class Enemy(pygame.sprite.Sprite):
                     
                     self.image = self.original_image.copy()
                     mask = pygame.mask.from_surface(self.image)
-                    bright_overlay = pygame.Surface(self.image.get_size(), pygame.SRCALPHA)
+                    dark_overlay = pygame.Surface(self.image.get_size(), pygame.SRCALPHA)
                     
                     # Заполняем только те пиксели, где есть спрайт
                     for x in range(self.image.get_width()):
@@ -365,9 +366,9 @@ class Enemy(pygame.sprite.Sprite):
                                 r = min(255, current_color[0] + brightness)
                                 g = min(255, current_color[1] + brightness)
                                 b = min(255, current_color[2] + brightness)
-                                bright_overlay.set_at((x, y), (r, g, b, current_color[3]))
+                                dark_overlay.set_at((x, y), (r, g, b, current_color[3]))
                     
-                    self.image.blit(bright_overlay, (0, 0))
+                    self.image.blit(dark_overlay, (0, 0))
         else:
             self.death_timer()
 

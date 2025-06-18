@@ -296,7 +296,7 @@ class Game:
         self.initial_boss_delay = False  # Сбрасываем флаг после первой задержки
 
         if self.boss_spawn_timer >= self.boss_spawn_interval:
-            print("Спавним босса!")  # Отладочное сообщение
+            # print("Спавним босса!")  # Отладочное сообщение
             
             # Спавним босса на расстоянии 200 пикселей от игрока в случайном направлении
             angle = random.randint(0, 360)  # Случайный угол
@@ -371,16 +371,10 @@ class Game:
                     self.all_sprites.draw(self.player.rect.center)
                     
                     # Отрисовка хитбоксов
-                    self.player.draw_hitbox(self.display_surface, self.all_sprites.offset)
-                    print(f"Camera offset: {self.all_sprites.offset}")  # Отладочная информация о смещении камеры
+                    # self.player.draw_hitbox(self.display_surface, self.all_sprites.offset)
                     for enemy in self.enemy_sprites:
-                        enemy.draw_hitbox(self.display_surface, self.all_sprites.offset)
-                        print(f"Drawing HP bar for enemy at {enemy.rect.center}")
+                    #     enemy.draw_hitbox(self.display_surface, self.all_sprites.offset)
                         enemy.draw_hp_bar(self.display_surface, self.all_sprites.offset)
-                    
-                    # Отрисовка области атаки меча
-                    if isinstance(self.player.current_weapon, Sword):
-                        self.player.current_weapon.draw_attack_area(self.display_surface)
                 
                 # Отрисовка HUD только во время игры
                 if self.player and self.hud:
@@ -390,6 +384,10 @@ class Game:
                 if not pygame.mouse.get_visible():
                     crosshair_rect = self.crosshair_image.get_rect(center = pygame.mouse.get_pos())
                     self.display_surface.blit(self.crosshair_image, crosshair_rect)
+                
+                # Отрисовка области атаки меча (после всего остального)
+                if self.player and isinstance(self.player.current_weapon, Sword):
+                    self.player.current_weapon.draw_attack_area(self.display_surface)
 
             pygame.display.update()
         
@@ -406,21 +404,21 @@ class Game:
             # Выбираем случайный тип врага, кроме босса
             available_frames = {k: v for k, v in self.enemy_frames.items() if k != 'Boss'}
             if available_frames:
-                print(f"Доступные типы врагов: {list(available_frames.keys())}")  # Отладочная информация
+                # print(f"Доступные типы врагов: {list(available_frames.keys())}")  # Отладочная информация
                 enemy_type = choice(list(available_frames.keys()))
                 frames = available_frames[enemy_type]
-                print(f"Создаем врага типа: {enemy_type}")  # Отладочная информация
+                # print(f"Создаем врага типа: {enemy_type}")  # Отладочная информация
                 
                 # Создаем врага соответствующего типа
                 if enemy_type == 'bat':
                     enemy = Bat(pos, frames, [self.all_sprites, self.enemy_sprites], self.player, self.collision_sprites)
-                    print(f"Создана летучая мышь: скорость={enemy.speed}, здоровье={enemy.health}, урон={enemy.damage}")
+                    # print(f"Создана летучая мышь: скорость={enemy.speed}, здоровье={enemy.health}, урон={enemy.damage}")
                 elif enemy_type == 'blob':
                     enemy = Slime(pos, frames, [self.all_sprites, self.enemy_sprites], self.player, self.collision_sprites)
-                    print(f"Создан слизень: скорость={enemy.speed}, здоровье={enemy.health}, урон={enemy.damage}")
+                    # print(f"Создан слизень: скорость={enemy.speed}, здоровье={enemy.health}, урон={enemy.damage}")
                 else:  # skeleton или любой другой тип
                     enemy = Skeleton(pos, frames, [self.all_sprites, self.enemy_sprites], self.player, self.collision_sprites)
-                    print(f"Создан скелет: скорость={enemy.speed}, здоровье={enemy.health}, урон={enemy.damage}")
+                    # print(f"Создан скелет: скорость={enemy.speed}, здоровье={enemy.health}, урон={enemy.damage}")
                 
                 # Применяем множители сложности
                 enemy.health = int(enemy.health * self.difficulty_multipliers[self.difficulty]['health'])

@@ -113,15 +113,16 @@ class Boss(Enemy):
                                     pygame.draw.line(surface, (255, 50, 50, alpha), 
                                                    start_pos, end_pos, 3)  # Увеличили толщину и сделали красный цвет ярче
                     
-                    print(f"Drawing HP bar at {bar_rect.topleft}, health={self.health}/{self.max_health}, width={health_width}")
+                    # print(f"Drawing HP bar at {bar_rect.topleft}, health={self.health}/{self.max_health}, width={health_width}")
             except Exception as e:
-                print(f"Error drawing HP bar: {e}")
+                # print(f"Error drawing HP bar: {e}")
+                pass
 
     def take_damage(self, amount):
         """Получение урона"""
         if self.death_time == 0:  # Проверяем, что босс еще жив
             self.health -= amount
-            print(f"Босс получил {amount} урона. Осталось здоровья: {self.health}")  # Для отладки
+            # print(f"Босс получил {amount} урона. Осталось здоровья: {self.health}")  # Для отладки
             
             # Создаем эффект попадания
             self.hit_effect_time = pygame.time.get_ticks()

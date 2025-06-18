@@ -229,7 +229,7 @@ class Player(pygame.sprite.Sprite):
                         'avtomat': 12   # Быстрая стрельба, но меньше урон
                     }.get(self.current_weapon, 15)
                     
-                    print(f"Попадание из {self.current_weapon}, урон: {weapon_damage}")  # Для отладки
+                    # print(f"Попадание из {self.current_weapon}, урон: {weapon_damage}")  # Для отладки
                     
                     # Наносим урон врагу
                     enemy.take_damage(weapon_damage)

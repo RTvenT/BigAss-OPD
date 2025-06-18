@@ -44,7 +44,7 @@ class HUD:
             'Sword': 'Меч',
             'AutoRifle': 'Автомат'
         }
-        print("HUD инициализирован, kills =", self.kills)  # Отладка
+        # print("HUD инициализирован, kills =", self.kills)  # Отладка
 
     def update(self):
         """Обновляем время игры"""
@@ -60,7 +60,7 @@ class HUD:
     def add_kill(self):
         """Увеличивает счетчик убийств"""
         self.kills += 1
-        print(f"Убито врагов: {self.kills}")  # Добавим для отладки
+        # print(f"Убито врагов: {self.kills}")  # Добавим для отладки
 
     def format_time(self, seconds):
         """Форматирует время в MM:SS"""
